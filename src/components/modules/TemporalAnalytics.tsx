@@ -4,9 +4,11 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine, ReferenceArea, Cell,
 } from 'recharts'
-import hourData from '@/data/real/by_hour.json'
-import dayData from '@/data/real/by_day.json'
-import monthData from '@/data/real/by_month.json'
+import { useApiResource } from '@/lib/api'
+import fallbackHourData from '@/data/real/by_hour.json'
+import fallbackDayData from '@/data/real/by_day.json'
+import fallbackMonthData from '@/data/real/by_month.json'
+import fallbackSummaryData from '@/data/real/summary.json'
 
 /* ── Types ── */
 interface HourlyEntry {
@@ -35,11 +37,19 @@ interface MonthEntry {
   weekendCount: number
 }
 
-/* ── Data ── */
-const hourly: HourlyEntry[] = hourData.hourly as HourlyEntry[]
-const heatmap: Record<string, number[]> = hourData.heatmap as Record<string, number[]>
-const days: DayEntry[] = dayData as DayEntry[]
-const months: MonthEntry[] = monthData as MonthEntry[]
+interface TemporalPayload {
+  hourly: HourlyEntry[]
+  heatmap: Record<string, number[]>
+  days: DayEntry[]
+  months: MonthEntry[]
+}
+
+const fallbackTemporalPayload: TemporalPayload = {
+  hourly: fallbackHourData.hourly as HourlyEntry[],
+  heatmap: fallbackHourData.heatmap as Record<string, number[]>,
+  days: fallbackDayData as DayEntry[],
+  months: fallbackMonthData as MonthEntry[],
+}
 
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const
 const DAY_SHORT: Record<string, string> = {
@@ -113,6 +123,13 @@ export default function TemporalAnalytics() {
   const [hoveredCell, setHoveredCell] = useState<{ day: string; hour: number; x: number; y: number } | null>(null)
   const [selectedRow, setSelectedRow] = useState<string | null>(null)
   const [selectedCol, setSelectedCol] = useState<number | null>(null)
+  const temporalData = useApiResource<TemporalPayload>('/api/temporal', fallbackTemporalPayload)
+  const summaryData = useApiResource<typeof fallbackSummaryData>('/api/summary', fallbackSummaryData)
+  const hourly = temporalData.hourly
+  const heatmap = temporalData.heatmap
+  const days = temporalData.days
+  const months = temporalData.months
+  const coverageLabel = `${summaryData.dateRange.min} to ${summaryData.dateRange.max}`
 
   /* ── Derived data ── */
   const heatmapMax = useMemo(() => {
@@ -122,11 +139,11 @@ export default function TemporalAnalytics() {
       if (row) row.forEach(v => { if (v > max) max = v })
     })
     return max
-  }, [])
+  }, [heatmap])
 
-  const peakHour = useMemo(() => hourly.reduce((p, c) => c.count > p.count ? c : p, hourly[0]), [])
-  const nightCount = useMemo(() => hourly.filter(h => isNightHour(h.hour)).reduce((s, h) => s + h.count, 0), [])
-  const totalCount = useMemo(() => hourly.reduce((s, h) => s + h.count, 0), [])
+  const peakHour = useMemo(() => hourly.reduce((p, c) => c.count > p.count ? c : p, hourly[0]), [hourly])
+  const nightCount = useMemo(() => hourly.filter(h => isNightHour(h.hour)).reduce((s, h) => s + h.count, 0), [hourly])
+  const totalCount = useMemo(() => hourly.reduce((s, h) => s + h.count, 0), [hourly])
   const nightPct = ((nightCount / totalCount) * 100).toFixed(1)
 
   const sundayData = days.find(d => d.day === 'Sunday')
@@ -135,7 +152,7 @@ export default function TemporalAnalytics() {
     ? (((sundayData.count - mondayData.count) / mondayData.count) * 100).toFixed(1)
     : '0'
 
-  const peakMonth = useMemo(() => months.reduce((p, c) => c.count > p.count ? c : p, months[0]), [])
+  const peakMonth = useMemo(() => months.reduce((p, c) => c.count > p.count ? c : p, months[0]), [months])
 
   const handleCellClick = useCallback((day: string, hour: number) => {
     setSelectedRow(prev => prev === day ? null : day)
@@ -155,7 +172,7 @@ export default function TemporalAnalytics() {
     hour: String(h.hour).padStart(2, '0'),
     count: h.count,
     approvalRate: h.approvalRate,
-  })), [])
+  })), [hourly])
 
   /* ── Day chart data ── */
   const dayChartData = useMemo(() => days.map(d => ({
@@ -163,14 +180,14 @@ export default function TemporalAnalytics() {
     count: d.count,
     approvalRate: d.approvalRate,
     isWeekend: d.isWeekend,
-  })), [])
+  })), [days])
 
   /* ── Month chart data ── */
   const monthChartData = useMemo(() => months.map(m => ({
     label: m.label,
     count: m.count,
     highRisk: m.highRisk,
-  })), [])
+  })), [months])
 
   /* ── Insight cards ── */
   const insights = [
@@ -236,7 +253,7 @@ export default function TemporalAnalytics() {
         </h1>
         <p className="text-sm text-text-secondary mt-1">
           Time-based pattern analysis across{' '}
-          <span className="font-mono text-platinum font-semibold">292,649</span> violations
+          <span className="font-mono text-platinum font-semibold">{summaryData.totalViolations.toLocaleString('en-IN')}</span> violations
         </p>
       </motion.div>
 
@@ -543,7 +560,7 @@ export default function TemporalAnalytics() {
               Monthly Enforcement Trend
             </h2>
             <p className="text-xs text-text-muted mt-0.5">
-              Nov 2023 – Apr 2024 · Peak month annotated
+              {coverageLabel} · Peak month annotated
             </p>
           </div>
           <div className="flex items-center gap-2 glass-card px-3 py-1.5">

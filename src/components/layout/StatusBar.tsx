@@ -29,6 +29,8 @@ const moduleLabels: Record<ModuleId, string> = {
   predictor: 'Congestion Predictor',
   patrols: 'Enforcement Routes',
   reports: 'Report Generator',
+  precincts: 'Precinct Performance',
+  economics: 'Economics Dashboard'
 }
 
 interface StatusDot {

@@ -58,7 +58,7 @@ export default function CongestionPredictor() {
   const congestionColor = predictionResult ? getCongestionColor(predictionResult.congestionLevel) : '#22C55E'
 
   return (
-    <div className="relative w-full min-h-screen bg-bg-primary p-6 lg:p-10 overflow-y-auto">
+    <div className="relative w-full bg-bg-primary p-6 lg:p-10 overflow-y-auto" style={{ minHeight: 'calc(100vh - 3rem)' }}>
       {/* ── Title ── */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}

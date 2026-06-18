@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { zones } from '@/data/zones'
+import summaryData from '@/data/real/summary.json'
+import insightsData from '@/data/real/insights.json'
 
 interface ReportHistoryItem {
   id: string
@@ -10,34 +12,36 @@ interface ReportHistoryItem {
   size: string
 }
 
-const PAST_REPORTS: ReportHistoryItem[] = [
-  {
-    id: 'rep-01',
-    title: 'Daily Enforcement Summary - Central',
-    date: '2026-06-16',
-    type: 'Daily',
-    size: '1.2 MB',
-  },
-  {
-    id: 'rep-02',
-    title: 'Weekly Traffic Volume Analytics',
-    date: '2026-06-14',
-    type: 'Weekly',
-    size: '4.8 MB',
-  },
-  {
-    id: 'rep-03',
-    title: 'Monthly Congestion Prediction Report',
-    date: '2026-06-01',
-    type: 'Monthly',
-    size: '12.4 MB',
-  },
-]
+function clampDate(value: string): string {
+  if (value < summaryData.dateRange.min) return summaryData.dateRange.min
+  if (value > summaryData.dateRange.max) return summaryData.dateRange.max
+  return value
+}
+
+function addDays(value: string, days: number): string {
+  const date = new Date(`${value}T00:00:00`)
+  date.setDate(date.getDate() + days)
+  return date.toISOString().split('T')[0]
+}
+
+function addMonths(value: string, months: number): string {
+  const date = new Date(`${value}T00:00:00`)
+  date.setMonth(date.getMonth() + months)
+  return date.toISOString().split('T')[0]
+}
+
+function hashString(value: string): string {
+  let hash = 0
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) >>> 0
+  }
+  return hash.toString(16).toUpperCase().padStart(8, '0')
+}
 
 export default function ReportGenerator() {
   const [reportType, setReportType] = useState<'daily' | 'weekly' | 'monthly'>('daily')
-  const [startDate, setStartDate] = useState('2026-06-16')
-  const [endDate, setEndDate] = useState('2026-06-16')
+  const [startDate, setStartDate] = useState(summaryData.dateRange.max)
+  const [endDate, setEndDate] = useState(summaryData.dateRange.max)
   const [selectedZones, setSelectedZones] = useState<string[]>(zones.map((z) => z.id))
   const [includedSections, setIncludedSections] = useState<string[]>([
     'heatmap',
@@ -46,19 +50,70 @@ export default function ReportGenerator() {
     'recommendations',
   ])
   const [generatingState, setGeneratingState] = useState<'idle' | 'generating' | 'success'>('idle')
+  const selectedZoneRecords = zones.filter((zone) => selectedZones.includes(zone.id))
+  const selectedViolationTotal = selectedZoneRecords.reduce((sum, zone) => sum + zone.stats.totalViolations, 0)
+  const selectedRevenueTotal = selectedZoneRecords.reduce((sum, zone) => sum + zone.stats.revenue, 0)
+  const reportPayload = {
+    reportType,
+    period: { startDate, endDate },
+    generatedAt: new Date().toISOString(),
+    dataset: {
+      dateRange: summaryData.dateRange,
+      totalViolations: summaryData.totalViolations,
+      approvalRate: summaryData.approvalRate,
+      totalStations: summaryData.totalStations,
+      totalJunctions: summaryData.totalJunctions,
+      highRiskRate: summaryData.highRiskRate,
+    },
+    selectedZones: selectedZoneRecords,
+    includedSections,
+    insights: insightsData,
+    notes: [
+      'Fine revenue is estimated at processing time because the source dataset does not include official fine amounts.',
+      'Zones are derived from the highest-volume police stations in the processed dataset.',
+    ],
+  }
+  const reportContent = JSON.stringify(reportPayload, null, 2)
+  const reportHash = hashString(reportContent)
+  const reportSize = `${Math.max(1, Math.ceil(new Blob([reportContent]).size / 1024))} KB`
+  const archivedReports: ReportHistoryItem[] = [
+    {
+      id: 'rep-dataset',
+      title: 'Processed Dataset Baseline',
+      date: summaryData.dateRange.max,
+      type: 'Dataset',
+      size: `${Math.max(1, Math.ceil(JSON.stringify(summaryData).length / 1024))} KB`,
+    },
+    {
+      id: 'rep-stations',
+      title: 'Top Station Zone Extract',
+      date: summaryData.dateRange.max,
+      type: 'Zones',
+      size: `${Math.max(1, Math.ceil(JSON.stringify(zones).length / 1024))} KB`,
+    },
+    {
+      id: 'rep-insights',
+      title: 'Generated Enforcement Insights',
+      date: summaryData.dateRange.max,
+      type: 'Insights',
+      size: `${Math.max(1, Math.ceil(JSON.stringify(insightsData).length / 1024))} KB`,
+    },
+  ]
 
   // Automatically update end date based on type for convenience
   useEffect(() => {
+    const safeStart = clampDate(startDate)
+    if (safeStart !== startDate) {
+      setStartDate(safeStart)
+      return
+    }
+
     if (reportType === 'daily') {
-      setEndDate(startDate)
+      setEndDate(safeStart)
     } else if (reportType === 'weekly') {
-      const start = new Date(startDate)
-      start.setDate(start.getDate() + 7)
-      setEndDate(start.toISOString().split('T')[0])
+      setEndDate(clampDate(addDays(safeStart, 6)))
     } else if (reportType === 'monthly') {
-      const start = new Date(startDate)
-      start.setMonth(start.getMonth() + 1)
-      setEndDate(start.toISOString().split('T')[0])
+      setEndDate(clampDate(addMonths(safeStart, 1)))
     }
   }, [reportType, startDate])
 
@@ -86,27 +141,27 @@ export default function ReportGenerator() {
     setGeneratingState('generating')
     setTimeout(() => {
       setGeneratingState('success')
-    }, 2500)
+    }, 600)
   }
 
   const handleReset = () => {
     setGeneratingState('idle')
   }
 
-  const mockDownload = () => {
-    const reportContent = `GRIDLOCK AI REPORT\n==================\nType: ${reportType.toUpperCase()}\nPeriod: ${startDate} to ${endDate}\nZones Included: ${selectedZones.length}\nSections: ${includedSections.join(', ')}\nGenerated at: ${new Date().toLocaleString()}\n`
-    const blob = new Blob([reportContent], { type: 'text/plain' })
+  const downloadReport = (payload = reportContent, filename = `gridlock_report_${reportType}_${startDate}_${endDate}.json`) => {
+    const blob = new Blob([payload], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `gridlock_report_${reportType}_${startDate}.txt`
+    link.download = filename
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+    setTimeout(() => URL.revokeObjectURL(url), 500)
   }
 
   return (
-    <div className="relative w-full min-h-screen bg-bg-primary p-6 lg:p-10 overflow-y-auto">
+    <div className="relative w-full bg-bg-primary p-6 lg:p-10 overflow-y-auto" style={{ minHeight: 'calc(100vh - 3rem)' }}>
       {/* ── Title ── */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -121,7 +176,7 @@ export default function ReportGenerator() {
           Report <span className="text-gradient-lime">Generator</span>
         </h1>
         <p className="text-text-secondary text-sm mt-1 max-w-md">
-          Export smart-city analytics. Configure parameters, assemble modules, and download tactical PDF/CSV sheets.
+          Export processed smart-city analytics from the current dataset.
         </p>
       </motion.div>
 
@@ -177,6 +232,8 @@ export default function ReportGenerator() {
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
+                    min={summaryData.dateRange.min}
+                    max={summaryData.dateRange.max}
                     disabled={generatingState === 'generating'}
                     className="w-full bg-bg-secondary/50 border border-border/60 rounded-lg px-3 py-2 text-platinum text-xs font-mono focus:outline-none focus:border-lime/40 transition-colors disabled:opacity-50"
                   />
@@ -187,6 +244,8 @@ export default function ReportGenerator() {
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
+                    min={summaryData.dateRange.min}
+                    max={summaryData.dateRange.max}
                     disabled={generatingState === 'generating' || reportType !== 'daily'}
                     className="w-full bg-bg-secondary/50 border border-border/60 rounded-lg px-3 py-2 text-platinum text-xs font-mono focus:outline-none focus:border-lime/40 transition-colors disabled:opacity-50"
                   />
@@ -333,10 +392,10 @@ export default function ReportGenerator() {
                     className="grid grid-cols-2 gap-2"
                   >
                     <button
-                      onClick={mockDownload}
+                      onClick={() => downloadReport()}
                       className="py-3 rounded-lg font-display font-bold text-sm bg-green text-bg-primary shadow-[0_0_25px_rgba(34,197,94,0.3)] hover:shadow-[0_0_35px_rgba(34,197,94,0.5)] transition-all duration-300 flex items-center justify-center gap-2"
                     >
-                      📥 DOWNLOAD PDF
+                      DOWNLOAD REPORT
                     </button>
                     <button
                       onClick={handleReset}
@@ -464,11 +523,11 @@ export default function ReportGenerator() {
                       <div className="my-2 space-y-1">
                         <div className="flex justify-between font-mono text-xs">
                           <span className="text-text-muted text-[10px]">TOTAL:</span>
-                          <span className="text-platinum font-bold">15,449</span>
+                          <span className="text-platinum font-bold">{selectedViolationTotal.toLocaleString('en-IN')}</span>
                         </div>
                         <div className="flex justify-between font-mono text-xs">
                           <span className="text-text-muted text-[10px]">REVENUE:</span>
-                          <span className="text-lime font-bold">₹12.6L</span>
+                          <span className="text-lime font-bold">₹{(selectedRevenueTotal / 100000).toFixed(1)}L</span>
                         </div>
                       </div>
                       <span className="text-[9px] text-text-muted font-mono uppercase tracking-wider">Aggregate summaries</span>
@@ -486,8 +545,9 @@ export default function ReportGenerator() {
                         <span className="text-xs">🤖</span>
                       </div>
                       <div className="my-2 space-y-1 text-[9px] font-mono text-text-secondary leading-tight">
-                        <p className="border-l border-green/40 pl-1.5">⚡ Deploy Patrol Unit Alpha to Silk Board</p>
-                        <p className="border-l border-green/40 pl-1.5">⚡ Retime signal JP Nagar (Peak 18:00)</p>
+                        {(insightsData as Array<{ title: string }>).slice(0, 2).map((insight) => (
+                          <p key={insight.title} className="border-l border-green/40 pl-1.5">{insight.title}</p>
+                        ))}
                       </div>
                       <span className="text-[9px] text-text-muted font-mono uppercase tracking-wider">Enforcement insights</span>
                     </div>
@@ -532,7 +592,7 @@ export default function ReportGenerator() {
                     {/* Success badge */}
                     <div className="w-20 h-20 rounded-full bg-green/10 border border-green shadow-[0_0_40px_rgba(34,197,94,0.3)] flex items-center justify-center text-3xl text-green relative">
                       ✓
-                      {/* Spark particles around checkmark (simulated) */}
+                      {/* Success particles */}
                       <div className="absolute w-2 h-2 rounded-full bg-green -top-2 left-6 animate-ping" />
                       <div className="absolute w-1.5 h-1.5 rounded-full bg-green top-12 -left-2 animate-ping" />
                       <div className="absolute w-2 h-2 rounded-full bg-green top-14 left-16 animate-ping" />
@@ -543,18 +603,18 @@ export default function ReportGenerator() {
                         Report Compiled Successfully
                       </h3>
                       <p className="font-mono text-xs text-text-secondary mt-1 border-t border-border/30 pt-2.5 max-w-sm mx-auto">
-                        <span className="text-text-muted">FILENAME:</span> gridlock_enforcement_rep_{reportType}_{startDate}.pdf
+                        <span className="text-text-muted">FILENAME:</span> gridlock_report_{reportType}_{startDate}_{endDate}.json
                       </p>
                       <p className="font-mono text-xs text-text-muted mt-1">
-                        <span className="text-text-muted">SIZE:</span> 2.4 MB • <span className="text-text-muted">PAGES:</span> 4 • <span className="text-text-muted">HASH:</span> SHA-256/9A4F
+                        <span className="text-text-muted">SIZE:</span> {reportSize} • <span className="text-text-muted">HASH:</span> {reportHash}
                       </p>
                     </div>
 
                     <button
-                      onClick={mockDownload}
+                      onClick={() => downloadReport()}
                       className="px-6 py-2.5 rounded-lg font-display font-bold text-sm bg-lime text-bg-primary hover:shadow-[0_0_20px_rgba(163,255,18,0.3)] transition-all"
                     >
-                      💾 SAVE TO LOCALDISK
+                      SAVE DATASET REPORT
                     </button>
                   </motion.div>
                 )}
@@ -569,7 +629,7 @@ export default function ReportGenerator() {
             </h2>
 
             <div className="space-y-3">
-              {PAST_REPORTS.map((report, i) => (
+              {archivedReports.map((report) => (
                 <div
                   key={report.id}
                   className="glass-card p-4 hover:border-border-bright transition-all duration-300 flex items-center justify-between"
@@ -591,7 +651,10 @@ export default function ReportGenerator() {
 
                   <button
                     onClick={() => {
-                      alert(`Downloading archived report: ${report.title}`)
+                      downloadReport(
+                        JSON.stringify({ report, summary: summaryData, zones, insights: insightsData }, null, 2),
+                        `${report.id}_${summaryData.dateRange.max}.json`,
+                      )
                     }}
                     className="shrink-0 w-8 h-8 rounded-lg bg-bg-secondary hover:bg-lime/10 border border-border hover:border-lime/30 flex items-center justify-center text-xs text-text-secondary hover:text-lime transition-all duration-200"
                     title="Download Archive"

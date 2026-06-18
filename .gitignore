@@ -31,3 +31,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Processed Data
+data/processed/
+src/data/real/*.json

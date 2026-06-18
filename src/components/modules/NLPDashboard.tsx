@@ -329,8 +329,36 @@ function parseQueryLocal(query: string): QueryResult {
     };
   }
 
-  // 8. TIME / HOURLY PATTERNS
-  if (q.includes('hour') || q.includes('time') || q.includes('when') || q.includes('night') || q.includes('day') || q.includes('morning') || q.includes('evening') || q.includes('afternoon') || q.includes('busy')) {
+  // 8. WEEKDAY VS WEEKEND / DAYS OF WEEK (must come before hourly to avoid 'day' keyword conflict)
+  if (q.includes('week') || q.includes('sunday') || q.includes('monday') || q.includes('saturday') ||
+      q.includes('tuesday') || q.includes('wednesday') || q.includes('thursday') || q.includes('friday') ||
+      q.includes('weekend') || q.includes('weekday') ||
+      (q.includes('day') && !q.includes('hourly') && !q.includes('time of day') && !q.includes('today'))) {
+    const data = dayData as any[];
+    const highest = data.reduce((max, d) => (d.count > max.count ? d : max), data[0]);
+    const lowest = data.reduce((min, d) => (d.count < min.count ? d : min), data[0]);
+
+    return {
+      type: 'bar',
+      title: 'Day of Week Violation Pattern',
+      subtitle: 'Comparing weekday vs weekend enforcement activity',
+      data: data.map((d: any) => ({
+        name: d.shortDay,
+        count: d.count,
+        percentage: d.percentage,
+        approvalRate: d.approvalRate,
+        fill: d.isWeekend ? ORANGE : LIME,
+      })),
+      dataKey: 'count',
+      nameKey: 'name',
+      colors: data.map((d: any) => (d.isWeekend ? ORANGE : LIME)),
+      insight: `⚡ Weekly Heat: ${highest.day} records the most violations (${highest.count.toLocaleString()}) while ${lowest.day} has the least (${lowest.count.toLocaleString()}). Weekend days average higher than weekdays.`,
+    };
+  }
+
+  // 9. TIME / HOURLY PATTERNS
+  if (q.includes('hour') || q.includes('time') || q.includes('when') || q.includes('night') ||
+      q.includes('morning') || q.includes('evening') || q.includes('afternoon') || q.includes('busy') || q.includes('peak hour')) {
     const data = (hourData as any).hourly;
     const peakHour = data.reduce((max: any, h: any) => (h.count > max.count ? h : max), data[0]);
     const nightViolations = data
@@ -351,30 +379,6 @@ function parseQueryLocal(query: string): QueryResult {
       dataKey: 'count',
       nameKey: 'name',
       insight: `⚡ Temporal Peak: Maximum enforcement occurs at ${peakHour.hour.toString().padStart(2, '0')}:00 with ${peakHour.count.toLocaleString()} violations (${peakHour.percentage}%). Night hours (9PM–6AM) account for ${nightPct}% of all violations.`,
-    };
-  }
-
-  // 9. WEEKDAY VS WEEKEND / DAYS OF WEEK
-  if (q.includes('week') || q.includes('day') || q.includes('sunday') || q.includes('monday') || q.includes('saturday') || q.includes('weekend') || q.includes('weekday')) {
-    const data = dayData as any[];
-    const highest = data.reduce((max, d) => (d.count > max.count ? d : max), data[0]);
-    const lowest = data.reduce((min, d) => (d.count < min.count ? d : min), data[0]);
-
-    return {
-      type: 'bar',
-      title: 'Day of Week Violation Pattern',
-      subtitle: 'Comparing weekday vs weekend enforcement activity',
-      data: data.map((d: any) => ({
-        name: d.shortDay,
-        count: d.count,
-        percentage: d.percentage,
-        approvalRate: d.approvalRate,
-        fill: d.isWeekend ? ORANGE : LIME,
-      })),
-      dataKey: 'count',
-      nameKey: 'name',
-      colors: data.map((d: any) => (d.isWeekend ? ORANGE : LIME)),
-      insight: `⚡ Weekly Heat: ${highest.day} records the most violations (${highest.count.toLocaleString()}) while ${lowest.day} has the least (${lowest.count.toLocaleString()}). Weekend days average higher than weekdays.`,
     };
   }
 
@@ -422,15 +426,21 @@ function parseQueryLocal(query: string): QueryResult {
     };
   }
 
-  // 12. DEFAULT FALLBACK BRIEF
+  // 12. DEFAULT: Show top stations with helpful hint
+  const topStationsFallback = [...(stationData as any[])].sort((a, b) => b.totalViolations - a.totalViolations).slice(0, 15);
+  const topFallback = topStationsFallback[0];
   return {
-    type: 'insights',
-    title: 'GridLock Intelligence Brief',
-    subtitle: 'Key patterns and anomalies detected in enforcement data',
-    data: insightsData as any[],
-    dataKey: '',
-    nameKey: '',
-    insight: `Analyzing ${(summaryData as any).totalViolations.toLocaleString()} violations across ${(summaryData as any).totalStations} stations. Ask about stations (e.g., "Upparpet"), vehicle types ("scooters"), hours, risk, or trends.`,
+    type: 'horizontal-bar',
+    title: 'Top 15 Stations by Violations',
+    subtitle: `Ranked across ${(summaryData as any).totalStations} stations · Try: "vehicles", "hourly pattern", "monthly trend", "risk analysis"`,
+    data: topStationsFallback.map((s: any) => ({
+      name: s.name,
+      violations: s.totalViolations,
+      percentage: ((s.totalViolations / (summaryData as any).totalViolations) * 100).toFixed(1),
+    })),
+    dataKey: 'violations',
+    nameKey: 'name',
+    insight: `⚡ Default Overview: ${topFallback?.name ?? 'Top station'} leads with ${(topFallback?.totalViolations ?? 0).toLocaleString()} violations. Try: "violations by vehicle type", "hourly pattern", "station approval rates", "high risk stations", "monthly trend".`,
   };
 }
 
@@ -719,15 +729,19 @@ const NLPDashboard = () => {
     setIsProcessing(true);
     setResult(null);
 
+    // Use local parser immediately for instant response
+    const localResult = parseQueryLocal(q);
+    setResult(localResult);
+    setIsProcessing(false);
+
+    // Optionally enhance with server response in background
     try {
-      const parsed = await parseQueryAI(q);
-      setResult(parsed);
-    } catch (err) {
-      console.warn('Gemini API call failed, falling back to local query parser:', err);
-      const parsed = parseQueryLocal(q);
-      setResult(parsed);
-    } finally {
-      setIsProcessing(false);
+      const serverResult = await parseQueryAI(q);
+      if (serverResult && serverResult.data?.length > 0) {
+        setResult(serverResult);
+      }
+    } catch {
+      // Server unavailable — local result already shown, no action needed
     }
   }, []);
 
@@ -781,7 +795,7 @@ const NLPDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen w-full px-4 py-8 md:px-8 lg:px-12">
+    <div className="w-full px-4 py-8 md:px-8 lg:px-12 overflow-y-auto" style={{ minHeight: 'calc(100vh - 3rem)' }}>
       {/* Module Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}

@@ -335,7 +335,7 @@ export default function HotspotIntelligence() {
 
   return (
     <motion.div
-      className="fixed inset-0 z-10 p-4 pt-16 pb-20 overflow-hidden pointer-events-auto"
+      className="w-full h-[calc(100vh-3rem)] p-4 overflow-hidden"
       initial={{ opacity: 0, y: 40 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}

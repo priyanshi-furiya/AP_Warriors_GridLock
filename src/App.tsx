@@ -12,6 +12,8 @@ const TemporalAnalytics = lazy(() => import('@/components/modules/TemporalAnalyt
 const CongestionPredictor = lazy(() => import('@/components/modules/CongestionPredictor'))
 const ZoneDeepDive = lazy(() => import('@/components/modules/ZoneDeepDive'))
 const ReportGenerator = lazy(() => import('@/components/modules/ReportGenerator'))
+const PrecinctPerformance = lazy(() => import('@/components/modules/PrecinctPerformance'))
+const EconomicsDashboard = lazy(() => import('@/components/modules/EconomicsDashboard'))
 
 // Layout
 const StatusBar = lazy(() => import('@/components/layout/StatusBar'))
@@ -43,6 +45,10 @@ function ModuleRenderer({ moduleId }: { moduleId: ModuleId }) {
       return <ReportGenerator />
     case 'nlpQuery':
       return <NlpQueryModule />
+    case 'precincts':
+      return <PrecinctPerformance />
+    case 'economics':
+      return <EconomicsDashboard />
     default:
       return <CommandDashboard />
   }

@@ -12,6 +12,8 @@ export type ModuleId =
   | 'zones'
   | 'reports'
   | 'nlpQuery'
+  | 'precincts'
+  | 'economics'
 
 export interface GlobalFilters {
   dateRange: [string, string]
@@ -27,6 +29,7 @@ interface AppState {
   isTransitioning: boolean
   dockExpanded: boolean
   sidebarCollapsed: boolean
+  mobileMenuOpen: boolean
   globalFilters: GlobalFilters
 
   setActiveModule: (module: ModuleId) => void
@@ -37,6 +40,8 @@ interface AppState {
   setDockExpanded: (expanded: boolean) => void
   setSidebarCollapsed: (collapsed: boolean) => void
   toggleSidebar: () => void
+  setMobileMenuOpen: (open: boolean) => void
+  toggleMobileMenu: () => void
   setGlobalFilters: (filters: Partial<GlobalFilters>) => void
 }
 
@@ -48,6 +53,7 @@ export const useAppStore = create<AppState>((set) => ({
   isTransitioning: false,
   dockExpanded: false,
   sidebarCollapsed: false,
+  mobileMenuOpen: false,
   globalFilters: {
     dateRange: ['2023-11-01', '2024-04-30'],
     selectedStations: [],
@@ -62,6 +68,8 @@ export const useAppStore = create<AppState>((set) => ({
   setDockExpanded: (expanded) => set({ dockExpanded: expanded }),
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
   toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
+  setMobileMenuOpen: (open) => set({ mobileMenuOpen: open }),
+  toggleMobileMenu: () => set((state) => ({ mobileMenuOpen: !state.mobileMenuOpen })),
   setGlobalFilters: (filters) =>
     set((state) => ({
       globalFilters: { ...state.globalFilters, ...filters },

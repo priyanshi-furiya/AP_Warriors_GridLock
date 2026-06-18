@@ -4,13 +4,25 @@ Reads the Parquet file and outputs pre-aggregated JSON files for the frontend.
 """
 import json
 import os
+import shutil
+import ast
 import pyarrow.parquet as pq
 import pandas as pd
 import numpy as np
 from datetime import datetime
 
-OUTPUT_DIR = os.path.join(os.path.dirname(__file__), '..', 'src', 'data', 'real')
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+RAW_DIR = os.path.join(PROJECT_ROOT, 'data', 'raw')
+OUTPUT_DIR = os.path.join(PROJECT_ROOT, 'data', 'processed')
+LEGACY_OUTPUT_DIR = os.path.join(PROJECT_ROOT, 'src', 'data', 'real')
+DEFAULT_INPUT_NAMES = [
+    'parking_violations_clean.parquet',
+    'parking_violations_clean.csv',
+]
+
+os.makedirs(RAW_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(LEGACY_OUTPUT_DIR, exist_ok=True)
 
 def json_serial(obj):
     if isinstance(obj, (np.integer,)):
@@ -31,10 +43,107 @@ def save(name, data):
     path = os.path.join(OUTPUT_DIR, name)
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(data, f, default=json_serial, ensure_ascii=False)
+    legacy_path = os.path.join(LEGACY_OUTPUT_DIR, name)
+    shutil.copyfile(path, legacy_path)
     print(f"  OK {name} ({os.path.getsize(path) / 1024:.1f} KB)")
 
-print("Loading Parquet file...")
-df = pq.read_table(os.path.join(os.path.dirname(__file__), '..', 'parking_violations_clean.csv')).to_pandas()
+def find_input_file():
+    configured = os.environ.get('GRIDLOCK_RAW_DATA')
+    if configured:
+        configured = os.path.abspath(configured)
+        if os.path.exists(configured):
+            return configured
+        raise FileNotFoundError(f"GRIDLOCK_RAW_DATA points to a missing file: {configured}")
+
+    candidates = []
+    for name in DEFAULT_INPUT_NAMES:
+        candidates.append(os.path.join(RAW_DIR, name))
+        candidates.append(os.path.join(PROJECT_ROOT, name))
+
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return candidate
+
+    expected = '\n  - '.join(candidates)
+    raise FileNotFoundError(
+        "No input dataset found. Put the raw data in data/raw/ as "
+        "parking_violations_clean.parquet or parking_violations_clean.csv.\n"
+        f"Checked:\n  - {expected}"
+    )
+
+def load_dataset(path):
+    ext = os.path.splitext(path)[1].lower()
+    if ext == '.parquet':
+        return pq.read_table(path).to_pandas()
+    if ext == '.csv':
+        return pd.read_csv(path, low_memory=False)
+    raise ValueError(f"Unsupported data file type: {ext}. Use .parquet or .csv.")
+
+def clean_violation_label(value):
+    if pd.isna(value):
+        return 'Unknown'
+    text = str(value)
+    try:
+        parsed = ast.literal_eval(text)
+        if isinstance(parsed, list) and parsed:
+            text = ', '.join(str(item) for item in parsed)
+    except (ValueError, SyntaxError):
+        pass
+    return text.replace('_', ' ').replace('-', ' ').title()
+
+def vehicle_class_to_ui(value):
+    value = str(value).upper()
+    if value == 'CAR':
+        return 'Car'
+    if value == '2W':
+        return 'Scooter'
+    if value == '3W':
+        return 'Auto'
+    if value == 'BUS':
+        return 'Bus'
+    if value in ['HV', 'LMV']:
+        return 'Truck'
+    return 'Car'
+
+def estimate_fine(row):
+    base = 500
+    if row.get('is_high_risk_violation', 0):
+        base = 1500
+    if row.get('num_violations', 1) and row.get('num_violations', 1) > 1:
+        base += int(row.get('num_violations', 1) - 1) * 250
+    return int(base)
+
+def validation_to_status(value, high_risk=False):
+    value = str(value).lower()
+    if high_risk:
+        return 'Escalated'
+    if value == 'approved':
+        return 'Paid'
+    if value == 'rejected':
+        return 'Disputed'
+    return 'Pending'
+
+def normalize_position(lat, lng, lat_min, lat_max, lng_min, lng_max):
+    lat_range = lat_max - lat_min or 1
+    lng_range = lng_max - lng_min or 1
+    x = ((lng - lng_min) / lng_range) * 12 - 6
+    z = ((lat - lat_min) / lat_range) * 11 - 5
+    return [round(float(x), 3), 0, round(float(z), 3)]
+
+def vehicle_mix_percentages(group):
+    counts = group['vehicle_class'].value_counts()
+    total_count = counts.sum() or 1
+    return {
+        'cars': int(round(counts.get('CAR', 0) / total_count * 100)),
+        'scooters': int(round(counts.get('2W', 0) / total_count * 100)),
+        'autos': int(round(counts.get('3W', 0) / total_count * 100)),
+        'trucks': int(round((counts.get('HV', 0) + counts.get('LMV', 0)) / total_count * 100)),
+        'buses': int(round(counts.get('BUS', 0) / total_count * 100)),
+    }
+
+input_file = find_input_file()
+print(f"Loading dataset: {input_file}")
+df = load_dataset(input_file)
 print(f"  Loaded {len(df):,} records")
 
 # ──────────────────────── 1. SUMMARY ────────────────────────
@@ -298,6 +407,16 @@ sun_vs_mon = round((sun_count - mon_count) / mon_count * 100, 1)
 worst_station = max([s for s in stations_data if s['totalViolations'] > 500],
                     key=lambda x: x['rejectedCount'] / max(x['totalViolations'], 1))
 worst_station_rej_rate = round(100 - worst_station['approvalRate'], 1)
+parking_count = sum(
+    item['count']
+    for item in viol_type_data
+    if 'PARKING' in item['type'].upper()
+)
+parking_pct = round(parking_count / total * 100, 1) if total else 0
+top_vehicle_class = max(vehicle_class_data, key=lambda x: x['count'])
+top_vehicle_pct = top_vehicle_class['percentage']
+peak_month = max(monthly_data, key=lambda x: x['count'])
+top_junction = junctions_data[0] if junctions_data else {'name': 'No Junction', 'count': 0}
 
 insights = [
     {
@@ -313,9 +432,9 @@ insights = [
         'id': 'parking-dominance',
         'icon': '🅿️',
         'title': 'Parking Violations Dominate',
-        'description': 'Over 95% of recorded violations are parking-related (Wrong Parking + No Parking). Non-parking violations like signal jumping and helmet violations are rarely captured.',
+        'description': f'{parking_pct}% of recorded violations are parking-related. Non-parking violations like signal jumping and helmet violations are much less represented in this dataset.',
         'severity': 'info',
-        'metric': '95%+',
+        'metric': f'{parking_pct}%',
         'metricLabel': 'Parking Related',
     },
     {
@@ -348,28 +467,28 @@ insights = [
     {
         'id': 'two-wheeler',
         'icon': '🛵',
-        'title': '2-Wheelers Account for 46% of Violations',
-        'description': f'Scooters and motorcycles are the most frequently violated vehicle category. {best_approval["vehicleClass"]} class has the best approval rate at {best_approval["approvalRate"]}%.',
+        'title': f'{top_vehicle_class["vehicleClass"]} Vehicles Lead Violations',
+        'description': f'{top_vehicle_class["vehicleClass"]} is the most frequent vehicle category at {top_vehicle_pct}% of violations. {best_approval["vehicleClass"]} class has the best approval rate at {best_approval["approvalRate"]}%.',
         'severity': 'info',
-        'metric': '46%',
-        'metricLabel': '2W Share',
+        'metric': f'{top_vehicle_pct}%',
+        'metricLabel': f'{top_vehicle_class["vehicleClass"]} Share',
     },
     {
         'id': 'seasonal-trend',
         'icon': '📈',
-        'title': 'January 2024 Enforcement Peak',
-        'description': 'January 2024 recorded 64,815 violations — the highest month. This may indicate a new enforcement drive or additional camera deployments.',
+        'title': f'{peak_month["label"]} Enforcement Peak',
+        'description': f'{peak_month["label"]} recorded {peak_month["count"]:,} violations — the highest month in the processed range.',
         'severity': 'info',
-        'metric': '64.8K',
-        'metricLabel': 'Jan 2024',
+        'metric': f'{peak_month["count"] / 1000:.1f}K',
+        'metricLabel': peak_month['label'],
     },
     {
         'id': 'junction-concentration',
         'icon': '🔀',
         'title': 'Junction Concentration',
-        'description': f'Safina Plaza Junction alone accounts for 15,174 violations. Top 5 junctions handle a disproportionate share of all junction-tagged violations.',
+        'description': f'{top_junction["name"]} alone accounts for {top_junction["count"]:,} violations. Top 5 junctions handle a disproportionate share of all junction-tagged violations.',
         'severity': 'warning',
-        'metric': '15.2K',
+        'metric': f'{top_junction["count"] / 1000:.1f}K',
         'metricLabel': 'Top Junction',
     },
 ]
@@ -389,4 +508,128 @@ for s in stations_data:
         })
 save('station_locations.json', station_locs)
 
-print(f"\nDone! Generated {len(os.listdir(OUTPUT_DIR))} files in {OUTPUT_DIR}")
+# ──────────────────────── 12. HOTSPOTS for map/intelligence ────────────────────────
+print("12. Generating hotspots.json...")
+lat_min, lat_max = df['latitude'].dropna().min(), df['latitude'].dropna().max()
+lng_min, lng_max = df['longitude'].dropna().min(), df['longitude'].dropna().max()
+latest_dates = sorted(df['date'].dropna().unique())[-7:]
+max_junction_count = max((j['count'] for j in junctions_data), default=1)
+hotspots_data = []
+for idx, junction in enumerate(junctions_data[:20]):
+    grp = jn_df[jn_df['junction_name'] == junction['name']]
+    if len(grp) == 0:
+        continue
+
+    hourly = grp['hour_of_day'].value_counts().sort_index()
+    peak_hour = int(hourly.idxmax()) if len(hourly) else 0
+    peak_start = max(0, peak_hour - 1)
+    peak_end = min(23, peak_hour + 1)
+    trend = []
+    for d in latest_dates:
+        trend.append(int(grp[grp['date'] == d].shape[0]))
+    if not any(trend):
+        trend = [int(round(junction['count'] / 7))] * 7
+
+    top_violations = [
+        clean_violation_label(name)
+        for name in grp['violation_type'].value_counts().head(3).index.tolist()
+    ]
+    station_name = str(grp['police_station'].mode().iloc[0]) if len(grp) > 0 else ''
+    severity = max(35, min(100, int(round(35 + (junction['count'] / max_junction_count) * 65))))
+
+    hotspots_data.append({
+        'id': f'hp-{idx + 1:02d}',
+        'name': str(junction['name']),
+        'lat': junction['latitude'],
+        'lng': junction['longitude'],
+        'severity': severity,
+        'violationCount': junction['count'],
+        'vehicleMix': vehicle_mix_percentages(grp),
+        'peakHours': f'{peak_start:02d}:00-{peak_end:02d}:00',
+        'peakWindow': [peak_start, peak_end],
+        'trend': trend,
+        'topViolations': top_violations,
+        'zone': station_name,
+        'position': normalize_position(junction['latitude'], junction['longitude'], lat_min, lat_max, lng_min, lng_max),
+    })
+save('hotspots.json', hotspots_data)
+
+# ──────────────────────── 13. ZONES for zone/patrol/report modules ────────────────────────
+print("13. Generating zones.json...")
+zone_colors = ['#FF6B35', '#A3FF12', '#E5E7EB', '#FBBF24', '#14B8A6', '#DC2626', '#8B5CF6', '#06B6D4']
+top_zone_stations = stations_data[:8]
+max_station_count = max((s['totalViolations'] for s in top_zone_stations), default=1)
+zones_generated = []
+for idx, station in enumerate(top_zone_stations):
+    station_grp = df[df['police_station'] == station['name']]
+    station_hotspots = [h for h in hotspots_data if h['zone'] == station['name']]
+    monthly_station = station_grp.groupby(['year', 'month']).size().reset_index(name='count')
+    trend = [int(v) for v in monthly_station['count'].tail(7).tolist()]
+    if len(trend) < 7:
+        trend = ([0] * (7 - len(trend))) + trend
+
+    lat = station['latitude'] or station_grp['latitude'].dropna().mean()
+    lng = station['longitude'] or station_grp['longitude'].dropna().mean()
+    scale_base = 1.7 + (station['totalViolations'] / max_station_count) * 1.6
+
+    zones_generated.append({
+        'id': f'zone-{idx + 1:02d}',
+        'name': station['name'],
+        'stationName': f'{station["name"]} Traffic PS',
+        'color': zone_colors[idx % len(zone_colors)],
+        'stats': {
+            'totalViolations': station['totalViolations'],
+            'activeHotspots': len(station_hotspots),
+            'patrolUnits': max(1, int(round(station['totalViolations'] / max_station_count * 5))),
+            'approvalRate': station['approvalRate'],
+            'revenue': int(station['totalViolations'] * 500),
+        },
+        'vehicleComposition': vehicle_mix_percentages(station_grp),
+        'trend': trend,
+        'position': normalize_position(lat, lng, lat_min, lat_max, lng_min, lng_max),
+        'scale': [round(scale_base, 2), 1, round(scale_base, 2)],
+    })
+save('zones.json', zones_generated)
+
+# ──────────────────────── 14. INCIDENTS from real violation records ────────────────────────
+print("14. Generating incidents.json...")
+incident_cols = [
+    'id', 'created_datetime', 'location', 'junction_name', 'police_station',
+    'vehicle_class', 'vehicle_number', 'updated_vehicle_number',
+    'violation_type', 'validation_status', 'is_high_risk_violation', 'num_violations'
+]
+incident_df = df[incident_cols].copy()
+incident_df = incident_df.sort_values('created_datetime', ascending=False).head(500)
+incidents = []
+for _, row in incident_df.iterrows():
+    location = row['junction_name'] if pd.notna(row['junction_name']) and row['junction_name'] != 'No Junction' else row['location']
+    vehicle_number = row['updated_vehicle_number'] if pd.notna(row['updated_vehicle_number']) else row['vehicle_number']
+    incidents.append({
+        'id': str(row['id']),
+        'timestamp': row['created_datetime'].isoformat() if pd.notna(row['created_datetime']) else '',
+        'location': str(location),
+        'hotspotId': '',
+        'vehicleType': vehicle_class_to_ui(row['vehicle_class']),
+        'violationType': clean_violation_label(row['violation_type']),
+        'plateNumber': str(vehicle_number) if pd.notna(vehicle_number) else 'UNKNOWN',
+        'fineAmount': estimate_fine(row),
+        'status': validation_to_status(row['validation_status'], bool(row['is_high_risk_violation'])),
+        'officerId': str(row['police_station']),
+    })
+save('incidents.json', incidents)
+
+# ──────────────────────── 15. PREDICTION JUNCTIONS from real hotspots ────────────────────────
+print("15. Generating prediction_junctions.json...")
+prediction_junctions = []
+for idx, hotspot in enumerate(hotspots_data[:10]):
+    prediction_junctions.append({
+        'id': f'jn-{idx + 1:02d}',
+        'name': hotspot['name'],
+        'hotspotId': hotspot['id'],
+        'baseViolations': hotspot['violationCount'],
+        'hourlyPattern': jn_df[jn_df['junction_name'] == hotspot['name']]['hour_of_day'].value_counts().sort_index().reindex(range(24), fill_value=0).astype(int).tolist(),
+    })
+save('prediction_junctions.json', prediction_junctions)
+
+print(f"\nDone! Generated {len([f for f in os.listdir(OUTPUT_DIR) if f.endswith('.json')])} files in {OUTPUT_DIR}")
+print(f"Frontend compatibility copy updated in {LEGACY_OUTPUT_DIR}")
