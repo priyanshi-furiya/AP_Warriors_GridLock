@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAppStore, type ModuleId } from '@/stores/appStore'
+import useLiveFeed from '@/hooks/useLiveFeed'
 
 function useClock() {
   const [time, setTime] = useState(() => new Date())
@@ -19,6 +20,7 @@ function useClock() {
 
 const moduleLabels: Record<ModuleId, string> = {
   landing: 'Landing',
+  controlRoom: 'Control Room',
   dashboard: 'Dashboard',
   nlpQuery: 'Ask GridLock',
   map: 'Map View',
@@ -33,34 +35,12 @@ const moduleLabels: Record<ModuleId, string> = {
   economics: 'Economics Dashboard'
 }
 
-interface StatusDot {
-  label: string
-  color: string
-  glowColor: string
-}
-
-const statusDots: StatusDot[] = [
-  {
-    label: 'System Online',
-    color: 'bg-green',
-    glowColor: 'shadow-[0_0_8px_rgba(34,197,94,0.6)]',
-  },
-  {
-    label: 'AI Active',
-    color: 'bg-lime',
-    glowColor: 'shadow-[0_0_8px_rgba(163,255,18,0.6)]',
-  },
-  {
-    label: 'Network',
-    color: 'bg-green',
-    glowColor: 'shadow-[0_0_8px_rgba(34,197,94,0.6)]',
-  },
-]
-
 export default function StatusBar() {
   const clock = useClock()
   const activeModule = useAppStore((s) => s.activeModule)
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed)
+  const feed = useLiveFeed()
+  const currentIncident = feed.currentIncident
 
   const sidebarWidth = sidebarCollapsed ? 64 : 260
 
@@ -95,24 +75,28 @@ export default function StatusBar() {
         {clock}
       </div>
 
-      {/* ── Center: Status Dots + Data Coverage ── */}
-      <div className="flex-1 flex items-center justify-center gap-6">
-        {statusDots.map((dot) => (
-          <div key={dot.label} className="flex items-center gap-2">
-            <span
-              className={`w-2 h-2 rounded-full ${dot.color} ${dot.glowColor} animate-pulse-glow`}
-            />
-            <span className="text-[11px] font-mono uppercase tracking-wider text-text-muted">
-              {dot.label}
+      {/* ── Center: Live Stream Summary ── */}
+      <div className="flex-1 flex items-center justify-center gap-5">
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-lime shadow-[0_0_8px_rgba(163,255,18,0.6)] animate-pulse-glow" />
+          <span className="text-[11px] font-mono uppercase tracking-wider text-text-muted">
+            Live stream
+          </span>
+        </div>
+
+        {currentIncident && (
+          <div className="flex items-center gap-2 px-3 py-1 rounded-md border border-lime/15 bg-lime/5 max-w-[520px]">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-lime">Current incident</span>
+            <span className="text-[10px] font-mono text-text-muted truncate">
+              {currentIncident.violationType} at {currentIncident.hotspot}
             </span>
           </div>
-        ))}
+        )}
 
-        {/* Data coverage badge */}
-        <div className="ml-4 flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border bg-bg-secondary/50">
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border bg-bg-secondary/50">
           <span className="w-1.5 h-1.5 rounded-full bg-lime/50" />
           <span className="text-[10px] font-mono text-text-muted tracking-wider">
-            Nov 2023 – Apr 2024 | 292,649 records
+            Window {feed.currentEvents.length}/25 | 292,649 source records
           </span>
         </div>
       </div>

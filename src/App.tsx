@@ -5,6 +5,7 @@ import { useAppStore, type ModuleId } from '@/stores/appStore'
 // Lazy load modules for code splitting
 const HotspotMap = lazy(() => import('@/components/modules/HotspotMap'))
 const CommandDashboard = lazy(() => import('@/components/modules/CommandDashboard'))
+const ControlRoom = lazy(() => import('@/components/modules/ControlRoom'))
 const HotspotIntelligence = lazy(() => import('@/components/modules/HotspotIntelligence'))
 const EnforcementRoutes = lazy(() => import('@/components/modules/EnforcementRoutes'))
 const IncidentExplorer = lazy(() => import('@/components/modules/IncidentExplorer'))
@@ -18,6 +19,9 @@ const EconomicsDashboard = lazy(() => import('@/components/modules/EconomicsDash
 // Layout
 const StatusBar = lazy(() => import('@/components/layout/StatusBar'))
 const CommandDock = lazy(() => import('@/components/layout/CommandDock'))
+const LiveSupervisor = lazy(() => import('@/components/shared/LiveSupervisor'))
+const AlertPanel = lazy(() => import('@/components/shared/AlertPanel'))
+const PrivacySentinel = lazy(() => import('@/components/shared/PrivacySentinel'))
 
 const NlpQueryModule = lazy(() => import('@/components/modules/NLPDashboard'))
 const LandingSequence = lazy(() => import('@/components/landing/LandingSequence'))
@@ -29,6 +33,8 @@ function ModuleRenderer({ moduleId }: { moduleId: ModuleId }) {
       return <HotspotMap />
     case 'dashboard':
       return <CommandDashboard />
+    case 'controlRoom':
+      return <ControlRoom />
     case 'hotspots':
       return <HotspotIntelligence />
     case 'patrols':
@@ -144,6 +150,13 @@ export default function App() {
           {/* Status Bar */}
           <Suspense fallback={null}>
             <StatusBar />
+          </Suspense>
+
+          {/* Live supervisor & alerts (global) */}
+          <Suspense fallback={null}>
+            <LiveSupervisor />
+            <AlertPanel />
+            <PrivacySentinel />
           </Suspense>
 
           {/* Main Content Area */}

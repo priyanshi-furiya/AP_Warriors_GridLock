@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
-import { zones } from '@/data/zones'
-import summaryData from '@/data/real/summary.json'
-import insightsData from '@/data/real/insights.json'
+import { useDataStore } from '@/stores/dataStore'
 
 interface ReportHistoryItem {
   id: string
@@ -12,9 +10,9 @@ interface ReportHistoryItem {
   size: string
 }
 
-function clampDate(value: string): string {
-  if (value < summaryData.dateRange.min) return summaryData.dateRange.min
-  if (value > summaryData.dateRange.max) return summaryData.dateRange.max
+function clampDate(value: string, min: string, max: string): string {
+  if (value < min) return min
+  if (value > max) return max
   return value
 }
 
@@ -39,6 +37,10 @@ function hashString(value: string): string {
 }
 
 export default function ReportGenerator() {
+  const summaryData = useDataStore(s => s.summary)
+  const insightsData = useDataStore(s => s.insights)
+  const zones = useDataStore(s => s.zones)
+
   const [reportType, setReportType] = useState<'daily' | 'weekly' | 'monthly'>('daily')
   const [startDate, setStartDate] = useState(summaryData.dateRange.max)
   const [endDate, setEndDate] = useState(summaryData.dateRange.max)
@@ -102,7 +104,7 @@ export default function ReportGenerator() {
 
   // Automatically update end date based on type for convenience
   useEffect(() => {
-    const safeStart = clampDate(startDate)
+    const safeStart = clampDate(startDate, summaryData.dateRange.min, summaryData.dateRange.max)
     if (safeStart !== startDate) {
       setStartDate(safeStart)
       return
@@ -111,9 +113,9 @@ export default function ReportGenerator() {
     if (reportType === 'daily') {
       setEndDate(safeStart)
     } else if (reportType === 'weekly') {
-      setEndDate(clampDate(addDays(safeStart, 6)))
+      setEndDate(clampDate(addDays(safeStart, 6), summaryData.dateRange.min, summaryData.dateRange.max))
     } else if (reportType === 'monthly') {
-      setEndDate(clampDate(addMonths(safeStart, 1)))
+      setEndDate(clampDate(addMonths(safeStart, 1), summaryData.dateRange.min, summaryData.dateRange.max))
     }
   }, [reportType, startDate])
 

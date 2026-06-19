@@ -1,6 +1,9 @@
 import { useState, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
-import { violations, type Violation } from '@/data/violations'
+import { type Violation } from '@/data/violations'
+import { useDataStore } from '@/stores/dataStore'
+import useLiveFeed from '@/hooks/useLiveFeed'
+import { useAppStore } from '@/stores/appStore'
 
 /* ── Constants ── */
 const ITEMS_PER_PAGE = 20
@@ -162,6 +165,9 @@ function ViolationCard({ violation }: { violation: Violation }) {
 
 /* ── Main Component ── */
 export default function IncidentExplorer() {
+  const violations = useDataStore((s) => s.violations)
+  const demoMode = useAppStore((s) => (s as any).demoMode)
+  const feed = useLiveFeed()
   const [searchQuery, setSearchQuery] = useState('')
   const [vehicleFilters, setVehicleFilters] = useState<Set<Violation['vehicleType']>>(new Set())
   const [statusFilters, setStatusFilters] = useState<Set<Violation['status']>>(new Set())
@@ -243,6 +249,20 @@ export default function IncidentExplorer() {
 
   return (
     <div className="w-full h-full flex flex-col overflow-hidden">
+      {demoMode && feed.currentEvents.length > 0 && (
+        <div className="mx-4 mt-4 glass-panel px-6 py-3 flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-text-muted uppercase tracking-widest">Live Events</span>
+            <div className="font-mono text-sm font-bold text-lime">{feed.currentEvents.length}</div>
+          </div>
+          <div className="flex-1 text-sm text-text-secondary">
+            {feed.currentEvents.slice(-3).map((e) => (
+              <span key={e.id} className="mr-4">{e.plateNumber} @ {e.hotspot} · {e.violationType}</span>
+            ))}
+          </div>
+          <div className="ml-auto text-xs text-text-muted">Realtime demo</div>
+        </div>
+      )}
       {/* ── Stats Bar ── */}
       <motion.div
         className="shrink-0 mx-4 mt-4 glass-panel px-6 py-3 flex items-center gap-6"

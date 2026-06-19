@@ -2,6 +2,7 @@ import { create } from 'zustand'
 
 export type ModuleId =
   | 'landing'
+  | 'controlRoom'
   | 'map'
   | 'dashboard'
   | 'hotspots'
@@ -24,6 +25,8 @@ export interface GlobalFilters {
 interface AppState {
   activeModule: ModuleId
   hasSeenIntro: boolean
+  demoMode: boolean
+  alerts: Array<{ id: string; title: string; message: string; level: 'info' | 'warning' | 'critical'; timestamp: string; seen?: boolean }>
   selectedHotspotId: string | null
   selectedZoneId: string | null
   isTransitioning: boolean
@@ -40,6 +43,9 @@ interface AppState {
   setDockExpanded: (expanded: boolean) => void
   setSidebarCollapsed: (collapsed: boolean) => void
   toggleSidebar: () => void
+  setDemoMode: (v: boolean) => void
+  addAlert: (a: { id?: string; title: string; message: string; level?: 'info' | 'warning' | 'critical' }) => void
+  dismissAlert: (id: string) => void
   setMobileMenuOpen: (open: boolean) => void
   toggleMobileMenu: () => void
   setGlobalFilters: (filters: Partial<GlobalFilters>) => void
@@ -48,6 +54,8 @@ interface AppState {
 export const useAppStore = create<AppState>((set) => ({
   activeModule: 'landing',
   hasSeenIntro: false,
+  demoMode: true,
+  alerts: [],
   selectedHotspotId: null,
   selectedZoneId: null,
   isTransitioning: false,
@@ -62,6 +70,17 @@ export const useAppStore = create<AppState>((set) => ({
 
   setActiveModule: (module) => set({ activeModule: module, isTransitioning: true }),
   setHasSeenIntro: (seen) => set({ hasSeenIntro: seen }),
+  setDemoMode: (v: boolean) => set({ demoMode: v }),
+  addAlert: (a) =>
+    set((state) => {
+      const id = a.id ?? `alert-${Date.now()}`
+      const next = [
+        { id, title: a.title, message: a.message, level: a.level ?? 'info', timestamp: new Date().toISOString(), seen: false },
+        ...state.alerts,
+      ]
+      return { alerts: next }
+    }),
+  dismissAlert: (id) => set((state) => ({ alerts: state.alerts.filter((x) => x.id !== id) })),
   setSelectedHotspot: (id) => set({ selectedHotspotId: id }),
   setSelectedZone: (id) => set({ selectedZoneId: id }),
   setIsTransitioning: (transitioning) => set({ isTransitioning: transitioning }),

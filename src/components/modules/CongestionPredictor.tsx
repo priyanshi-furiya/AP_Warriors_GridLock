@@ -29,7 +29,13 @@ interface PredictionResult {
 }
 
 /* ═══════════════════════════════════════════════════ */
+import useLiveFeed from '@/hooks/useLiveFeed'
+import { useAppStore } from '@/stores/appStore'
+
 export default function CongestionPredictor() {
+  const demoMode = useAppStore((s) => (s as any).demoMode)
+  const feed = useLiveFeed()
+  const liveCount = demoMode ? feed.currentEvents.length : 0
   const [selectedJunction, setSelectedJunction] = useState(predictions.junctions[0].id)
   const [selectedHour, setSelectedHour] = useState(9)
   const [predictionResult, setPredictionResult] = useState<PredictionResult | null>(null)
@@ -75,6 +81,9 @@ export default function CongestionPredictor() {
         <p className="text-text-secondary text-sm mt-1 max-w-md">
           AI-powered traffic forecasting — select a junction &amp; hour to predict violations.
         </p>
+        {demoMode && (
+          <div className="mt-3 text-xs font-mono text-text-muted">Live events: <span className="text-lime font-bold">{liveCount}</span></div>
+        )}
       </motion.div>
 
       <div className="flex flex-col xl:flex-row gap-6">

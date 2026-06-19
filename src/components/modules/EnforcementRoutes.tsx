@@ -1,7 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
+import useLiveFeed from '@/hooks/useLiveFeed'
+import { useAppStore } from '@/stores/appStore'
 import { motion, AnimatePresence } from 'motion/react'
-import { patrolRoutes, type PatrolRoute } from '@/data/zones'
-import { hotspots, getSeverityColor } from '@/data/hotspots'
+import { type PatrolRoute } from '@/data/zones'
+import { getSeverityColor } from '@/data/hotspots'
+import { useDataStore } from '@/stores/dataStore'
 import { MapContainer, TileLayer, CircleMarker, Popup, Polyline, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -124,6 +127,11 @@ function MapAutoCenter({ bounds }: { bounds: [number, number][] }) {
 
 /* ── Main Component ── */
 export default function EnforcementRoutes() {
+  const hotspots = useDataStore((s) => s.hotspots)
+  const patrolRoutes = useDataStore((s) => s.patrolRoutes)
+  const demoMode = useAppStore((s) => (s as any).demoMode)
+  const feed = useLiveFeed()
+  const liveCount = demoMode ? feed.currentEvents.length : 0
   const [selectedRouteId, setSelectedRouteId] = useState(patrolRoutes[0].id)
   const [routeGeometries, setRouteGeometries] = useState<Record<string, [number, number][]>>({})
 

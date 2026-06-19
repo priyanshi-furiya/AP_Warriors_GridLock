@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { useAppStore } from '@/stores/appStore'
-import { zones, type Zone } from '@/data/zones'
+import { useDataStore } from '@/stores/dataStore'
+import { type Zone } from '@/data/zones'
 
 /* ───────── zone map layout (approximate Bangalore geography) ───────── */
 const ZONE_LAYOUT: Record<string, { x: number; y: number; w: number; h: number }> = {
@@ -47,6 +48,7 @@ const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 /* ═══════════════════════════════════════════════════ */
 export default function ZoneDeepDive() {
+  const zones = useDataStore((s) => s.zones)
   const selectedZoneId = useAppStore((s) => s.selectedZoneId)
   const setSelectedZone = useAppStore((s) => s.setSelectedZone)
 

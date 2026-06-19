@@ -1,7 +1,10 @@
 import { useState, useMemo } from 'react'
+import useLiveFeed from '@/hooks/useLiveFeed'
+import { useAppStore } from '@/stores/appStore'
 import { motion, AnimatePresence } from 'motion/react'
-import { hotspots, getSeverityColor } from '@/data/hotspots'
+import { getSeverityColor } from '@/data/hotspots'
 import type { Hotspot } from '@/data/hotspots'
+import { useDataStore } from '@/stores/dataStore'
 import {
   AreaChart,
   Area,
@@ -319,6 +322,9 @@ function RankingRow({
 
 // ─── Main Component ──────────────────────────────────
 export default function HotspotIntelligence() {
+  const hotspots = useDataStore((s) => s.hotspots)
+  const demoMode = useAppStore((s) => (s as any).demoMode)
+  const feed = useLiveFeed()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -403,6 +409,11 @@ export default function HotspotIntelligence() {
               </button>
             )}
           </div>
+          {demoMode && (
+            <div className="ml-3 text-xs font-mono text-text-muted">
+              Live events: <span className="font-bold text-lime">{feed.currentEvents.length}</span>
+            </div>
+          )}
         </div>
 
         {/* ── Column Headers ─────────────────────── */}

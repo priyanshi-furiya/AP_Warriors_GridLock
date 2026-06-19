@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 import ast
+import hashlib
 import pyarrow.parquet as pq
 import pandas as pd
 import numpy as np
@@ -24,6 +25,7 @@ os.makedirs(RAW_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(LEGACY_OUTPUT_DIR, exist_ok=True)
 
+
 def json_serial(obj):
     if isinstance(obj, (np.integer,)):
         return int(obj)
@@ -39,6 +41,7 @@ def json_serial(obj):
         return None
     raise TypeError(f"Type {type(obj)} not serializable")
 
+
 def save(name, data):
     path = os.path.join(OUTPUT_DIR, name)
     with open(path, 'w', encoding='utf-8') as f:
@@ -47,13 +50,15 @@ def save(name, data):
     shutil.copyfile(path, legacy_path)
     print(f"  OK {name} ({os.path.getsize(path) / 1024:.1f} KB)")
 
+
 def find_input_file():
     configured = os.environ.get('GRIDLOCK_RAW_DATA')
     if configured:
         configured = os.path.abspath(configured)
         if os.path.exists(configured):
             return configured
-        raise FileNotFoundError(f"GRIDLOCK_RAW_DATA points to a missing file: {configured}")
+        raise FileNotFoundError(
+            f"GRIDLOCK_RAW_DATA points to a missing file: {configured}")
 
     candidates = []
     for name in DEFAULT_INPUT_NAMES:
@@ -71,13 +76,22 @@ def find_input_file():
         f"Checked:\n  - {expected}"
     )
 
+
 def load_dataset(path):
+    with open(path, 'rb') as f:
+        signature = f.read(4)
+
     ext = os.path.splitext(path)[1].lower()
-    if ext == '.parquet':
+    if signature == b'PAR1' or ext == '.parquet':
         return pq.read_table(path).to_pandas()
     if ext == '.csv':
-        return pd.read_csv(path, low_memory=False)
-    raise ValueError(f"Unsupported data file type: {ext}. Use .parquet or .csv.")
+        try:
+            return pd.read_csv(path, low_memory=False)
+        except (UnicodeDecodeError, pd.errors.ParserError):
+            return pq.read_table(path).to_pandas()
+    raise ValueError(
+        f"Unsupported data file type: {ext}. Use .parquet or .csv.")
+
 
 def clean_violation_label(value):
     if pd.isna(value):
@@ -90,6 +104,7 @@ def clean_violation_label(value):
     except (ValueError, SyntaxError):
         pass
     return text.replace('_', ' ').replace('-', ' ').title()
+
 
 def vehicle_class_to_ui(value):
     value = str(value).upper()
@@ -105,6 +120,7 @@ def vehicle_class_to_ui(value):
         return 'Truck'
     return 'Car'
 
+
 def estimate_fine(row):
     base = 500
     if row.get('is_high_risk_violation', 0):
@@ -112,6 +128,7 @@ def estimate_fine(row):
     if row.get('num_violations', 1) and row.get('num_violations', 1) > 1:
         base += int(row.get('num_violations', 1) - 1) * 250
     return int(base)
+
 
 def validation_to_status(value, high_risk=False):
     value = str(value).lower()
@@ -123,12 +140,14 @@ def validation_to_status(value, high_risk=False):
         return 'Disputed'
     return 'Pending'
 
+
 def normalize_position(lat, lng, lat_min, lat_max, lng_min, lng_max):
     lat_range = lat_max - lat_min or 1
     lng_range = lng_max - lng_min or 1
     x = ((lng - lng_min) / lng_range) * 12 - 6
     z = ((lat - lat_min) / lat_range) * 11 - 5
     return [round(float(x), 3), 0, round(float(z), 3)]
+
 
 def vehicle_mix_percentages(group):
     counts = group['vehicle_class'].value_counts()
@@ -141,18 +160,26 @@ def vehicle_mix_percentages(group):
         'buses': int(round(counts.get('BUS', 0) / total_count * 100)),
     }
 
+
 input_file = find_input_file()
 print(f"Loading dataset: {input_file}")
 df = load_dataset(input_file)
 print(f"  Loaded {len(df):,} records")
+
+lat_min = df['latitude'].dropna().min()
+lat_max = df['latitude'].dropna().max()
+lng_min = df['longitude'].dropna().min()
+lng_max = df['longitude'].dropna().max()
 
 # ──────────────────────── 1. SUMMARY ────────────────────────
 print("\n1. Generating summary.json...")
 total = len(df)
 approved = len(df[df['validation_status'] == 'approved'])
 rejected = len(df[df['validation_status'] == 'rejected'])
-val_with_status = len(df[df['validation_status'].isin(['approved', 'rejected'])])
-approval_rate = round(approved / val_with_status * 100, 1) if val_with_status > 0 else 0
+val_with_status = len(
+    df[df['validation_status'].isin(['approved', 'rejected'])])
+approval_rate = round(approved / val_with_status * 100,
+                      1) if val_with_status > 0 else 0
 high_risk = df['is_high_risk_violation'].sum()
 peak_hour_count = df['is_peak_hour'].sum()
 stations = df['police_station'].nunique()
@@ -204,7 +231,8 @@ for name, grp in station_grp:
     val_sub = grp[grp['validation_status'].isin(['approved', 'rejected'])]
     app_count = len(val_sub[val_sub['validation_status'] == 'approved'])
     rej_count = len(val_sub[val_sub['validation_status'] == 'rejected'])
-    app_rate = round(app_count / len(val_sub) * 100, 1) if len(val_sub) > 0 else 0
+    app_rate = round(app_count / len(val_sub) * 100,
+                     1) if len(val_sub) > 0 else 0
 
     # Vehicle class breakdown
     vc = grp['vehicle_class'].value_counts().to_dict()
@@ -232,6 +260,7 @@ for name, grp in station_grp:
         'topViolations': {str(k): int(v) for k, v in top_viols.items()},
         'latitude': round(float(lat), 6) if not pd.isna(lat) else None,
         'longitude': round(float(lng), 6) if not pd.isna(lng) else None,
+        'position': normalize_position(lat, lng, lat_min, lat_max, lng_min, lng_max) if not pd.isna(lat) and not pd.isna(lng) else None,
         'weekendCount': int(grp['is_weekend'].sum()),
         'weekdayCount': int(len(grp) - grp['is_weekend'].sum()),
     })
@@ -246,7 +275,8 @@ vc_grp = df.groupby('vehicle_class')
 vehicle_class_data = []
 for name, grp in vc_grp:
     val_sub = grp[grp['validation_status'].isin(['approved', 'rejected'])]
-    app_rate = round(len(val_sub[val_sub['validation_status'] == 'approved']) / len(val_sub) * 100, 1) if len(val_sub) > 0 else 0
+    app_rate = round(len(val_sub[val_sub['validation_status'] == 'approved']
+                         ) / len(val_sub) * 100, 1) if len(val_sub) > 0 else 0
     vehicle_class_data.append({
         'vehicleClass': str(name),
         'count': int(len(grp)),
@@ -266,7 +296,8 @@ for name, count in vt_counts.items():
         'percentage': round(count / total * 100, 1),
     })
 
-save('by_vehicle.json', {'byClass': vehicle_class_data, 'byType': vehicle_type_data})
+save('by_vehicle.json', {
+     'byClass': vehicle_class_data, 'byType': vehicle_type_data})
 
 # ──────────────────────── 4. BY HOUR ────────────────────────
 print("4. Generating by_hour.json...")
@@ -274,10 +305,12 @@ hourly_data = []
 for h in range(24):
     h_df = df[df['hour_of_day'] == h]
     if len(h_df) == 0:
-        hourly_data.append({'hour': h, 'count': 0, 'percentage': 0, 'approvalRate': 0, 'highRisk': 0})
+        hourly_data.append(
+            {'hour': h, 'count': 0, 'percentage': 0, 'approvalRate': 0, 'highRisk': 0})
         continue
     val_sub = h_df[h_df['validation_status'].isin(['approved', 'rejected'])]
-    app_rate = round(len(val_sub[val_sub['validation_status'] == 'approved']) / len(val_sub) * 100, 1) if len(val_sub) > 0 else 0
+    app_rate = round(len(val_sub[val_sub['validation_status'] == 'approved']
+                         ) / len(val_sub) * 100, 1) if len(val_sub) > 0 else 0
     hourly_data.append({
         'hour': h,
         'count': int(len(h_df)),
@@ -287,12 +320,15 @@ for h in range(24):
     })
 
 # Day-of-week × hour heatmap
-dow_hour = df.groupby(['day_name', 'hour_of_day']).size().reset_index(name='count')
-days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+dow_hour = df.groupby(['day_name', 'hour_of_day']
+                      ).size().reset_index(name='count')
+days_order = ['Monday', 'Tuesday', 'Wednesday',
+              'Thursday', 'Friday', 'Saturday', 'Sunday']
 heatmap = {}
 for day in days_order:
     day_data = dow_hour[dow_hour['day_name'] == day]
-    heatmap[day] = [int(day_data[day_data['hour_of_day'] == h]['count'].sum()) for h in range(24)]
+    heatmap[day] = [int(day_data[day_data['hour_of_day'] == h]
+                        ['count'].sum()) for h in range(24)]
 
 save('by_hour.json', {'hourly': hourly_data, 'heatmap': heatmap})
 
@@ -346,7 +382,8 @@ day_data = []
 for day in days_order:
     d_df = df[df['day_name'] == day]
     val_sub = d_df[d_df['validation_status'].isin(['approved', 'rejected'])]
-    app_rate = round(len(val_sub[val_sub['validation_status'] == 'approved']) / len(val_sub) * 100, 1) if len(val_sub) > 0 else 0
+    app_rate = round(len(val_sub[val_sub['validation_status'] == 'approved']
+                         ) / len(val_sub) * 100, 1) if len(val_sub) > 0 else 0
     day_data.append({
         'day': day,
         'shortDay': day[:3],
@@ -379,18 +416,20 @@ print("9. Generating geo_points.json...")
 geo = df[['latitude', 'longitude']].dropna()
 if len(geo) > 5000:
     geo = geo.sample(n=5000, random_state=42)
-geo_points = [[round(r['latitude'], 5), round(r['longitude'], 5)] for _, r in geo.iterrows()]
+geo_points = [[round(r['latitude'], 5), round(r['longitude'], 5)]
+              for _, r in geo.iterrows()]
 save('geo_points.json', geo_points)
 
 # ──────────────────────── 10. INSIGHTS ────────────────────────
 print("10. Generating insights.json...")
 
 # Night enforcement analysis
-night_hours = df[df['hour_of_day'].isin([0,1,2,3,4,5,21,22,23])]
+night_hours = df[df['hour_of_day'].isin([0, 1, 2, 3, 4, 5, 21, 22, 23])]
 night_pct = round(len(night_hours) / total * 100, 1)
 
 # Station workload imbalance
-sorted_stations = sorted(stations_data, key=lambda x: x['totalViolations'], reverse=True)
+sorted_stations = sorted(
+    stations_data, key=lambda x: x['totalViolations'], reverse=True)
 top5_count = sum(s['totalViolations'] for s in sorted_stations[:5])
 top5_pct = round(top5_count / total * 100, 1)
 
@@ -416,7 +455,8 @@ parking_pct = round(parking_count / total * 100, 1) if total else 0
 top_vehicle_class = max(vehicle_class_data, key=lambda x: x['count'])
 top_vehicle_pct = top_vehicle_class['percentage']
 peak_month = max(monthly_data, key=lambda x: x['count'])
-top_junction = junctions_data[0] if junctions_data else {'name': 'No Junction', 'count': 0}
+top_junction = junctions_data[0] if junctions_data else {
+    'name': 'No Junction', 'count': 0}
 
 insights = [
     {
@@ -511,7 +551,8 @@ save('station_locations.json', station_locs)
 # ──────────────────────── 12. HOTSPOTS for map/intelligence ────────────────────────
 print("12. Generating hotspots.json...")
 lat_min, lat_max = df['latitude'].dropna().min(), df['latitude'].dropna().max()
-lng_min, lng_max = df['longitude'].dropna().min(), df['longitude'].dropna().max()
+lng_min, lng_max = df['longitude'].dropna(
+).min(), df['longitude'].dropna().max()
 latest_dates = sorted(df['date'].dropna().unique())[-7:]
 max_junction_count = max((j['count'] for j in junctions_data), default=1)
 hotspots_data = []
@@ -534,8 +575,10 @@ for idx, junction in enumerate(junctions_data[:20]):
         clean_violation_label(name)
         for name in grp['violation_type'].value_counts().head(3).index.tolist()
     ]
-    station_name = str(grp['police_station'].mode().iloc[0]) if len(grp) > 0 else ''
-    severity = max(35, min(100, int(round(35 + (junction['count'] / max_junction_count) * 65))))
+    station_name = str(grp['police_station'].mode().iloc[0]
+                       ) if len(grp) > 0 else ''
+    severity = max(
+        35, min(100, int(round(35 + (junction['count'] / max_junction_count) * 65))))
 
     hotspots_data.append({
         'id': f'hp-{idx + 1:02d}',
@@ -556,14 +599,18 @@ save('hotspots.json', hotspots_data)
 
 # ──────────────────────── 13. ZONES for zone/patrol/report modules ────────────────────────
 print("13. Generating zones.json...")
-zone_colors = ['#FF6B35', '#A3FF12', '#E5E7EB', '#FBBF24', '#14B8A6', '#DC2626', '#8B5CF6', '#06B6D4']
+zone_colors = ['#FF6B35', '#A3FF12', '#E5E7EB',
+               '#FBBF24', '#14B8A6', '#DC2626', '#8B5CF6', '#06B6D4']
 top_zone_stations = stations_data[:8]
-max_station_count = max((s['totalViolations'] for s in top_zone_stations), default=1)
+max_station_count = max((s['totalViolations']
+                        for s in top_zone_stations), default=1)
 zones_generated = []
 for idx, station in enumerate(top_zone_stations):
     station_grp = df[df['police_station'] == station['name']]
-    station_hotspots = [h for h in hotspots_data if h['zone'] == station['name']]
-    monthly_station = station_grp.groupby(['year', 'month']).size().reset_index(name='count')
+    station_hotspots = [
+        h for h in hotspots_data if h['zone'] == station['name']]
+    monthly_station = station_grp.groupby(
+        ['year', 'month']).size().reset_index(name='count')
     trend = [int(v) for v in monthly_station['count'].tail(7).tolist()]
     if len(trend) < 7:
         trend = ([0] * (7 - len(trend))) + trend
@@ -599,11 +646,14 @@ incident_cols = [
     'violation_type', 'validation_status', 'is_high_risk_violation', 'num_violations'
 ]
 incident_df = df[incident_cols].copy()
-incident_df = incident_df.sort_values('created_datetime', ascending=False).head(500)
+incident_df = incident_df.sort_values(
+    'created_datetime', ascending=False).head(500)
 incidents = []
 for _, row in incident_df.iterrows():
-    location = row['junction_name'] if pd.notna(row['junction_name']) and row['junction_name'] != 'No Junction' else row['location']
-    vehicle_number = row['updated_vehicle_number'] if pd.notna(row['updated_vehicle_number']) else row['vehicle_number']
+    location = row['junction_name'] if pd.notna(
+        row['junction_name']) and row['junction_name'] != 'No Junction' else row['location']
+    vehicle_number = row['updated_vehicle_number'] if pd.notna(
+        row['updated_vehicle_number']) else row['vehicle_number']
     incidents.append({
         'id': str(row['id']),
         'timestamp': row['created_datetime'].isoformat() if pd.notna(row['created_datetime']) else '',
@@ -631,5 +681,81 @@ for idx, hotspot in enumerate(hotspots_data[:10]):
     })
 save('prediction_junctions.json', prediction_junctions)
 
-print(f"\nDone! Generated {len([f for f in os.listdir(OUTPUT_DIR) if f.endswith('.json')])} files in {OUTPUT_DIR}")
+# ──────────────────────── 16. DEMO STREAM for live-control-room mode ────────────────────────
+print("16. Generating demo_stream.json...")
+demo_rows = df.sort_values('created_datetime').reset_index(drop=True)
+if len(demo_rows) > 240:
+    sample_idx = np.linspace(0, len(demo_rows) - 1, 240).round().astype(int)
+    demo_rows = demo_rows.iloc[sample_idx].reset_index(drop=True)
+
+station_lookup = {str(s['name']).lower(): s for s in stations_data}
+hotspot_lookup = {str(h['zone']).lower(): h for h in hotspots_data}
+
+demo_events = []
+for idx, row in demo_rows.iterrows():
+    station_name = str(row['police_station'])
+    hotspot = hotspot_lookup.get(station_name.lower())
+    station = station_lookup.get(station_name.lower())
+    lat = row['latitude']
+    lng = row['longitude']
+    if hotspot and hotspot.get('position'):
+        position = hotspot['position']
+    elif station and station.get('position'):
+        position = station['position']
+    elif not pd.isna(lat) and not pd.isna(lng):
+        position = normalize_position(
+            lat, lng, lat_min, lat_max, lng_min, lng_max)
+    else:
+        position = [0, 0, 0]
+
+    plate = str(row['vehicle_number']) if pd.notna(
+        row['vehicle_number']) else 'UNKNOWN'
+    masked_plate = 'REDACTED'
+    if plate and plate != 'UNKNOWN':
+        cleaned_plate = ''.join(ch for ch in plate if ch.isalnum()).upper()
+        if len(cleaned_plate) > 6:
+            masked_plate = f"{cleaned_plate[:2]}***{cleaned_plate[-4:]}"
+        elif cleaned_plate:
+            masked_plate = f"XX***{cleaned_plate[-4:]}"
+
+    parking_violation = bool(row['has_parking_violation']) if 'has_parking_violation' in row.index and not pd.isna(
+        row['has_parking_violation']) else 'PARKING' in str(row['violation_type']).upper()
+    latency = row['scita_latency_mins'] if 'scita_latency_mins' in row.index else None
+    if pd.isna(latency):
+        latency = 5 + int(row.get('num_violations', 1)) * 2
+    latency = int(max(0, round(float(latency))))
+    impact_score = min(
+        100,
+        int(round(latency * 2 + (16 if parking_violation else 4) +
+            (18 if bool(row['is_high_risk_violation']) else 0)))
+    )
+
+    demo_events.append({
+        'id': f'demo-{idx + 1:04d}',
+        'timestamp': row['created_datetime'].isoformat() if pd.notna(row['created_datetime']) else '',
+        'station': station_name,
+        'hotspot': str(hotspot['name']) if hotspot else station_name,
+        'location': str(row['location']) if pd.notna(row['location']) else station_name,
+        'vehicleClass': vehicle_class_to_ui(row['vehicle_class']),
+        'violationType': clean_violation_label(row['violation_type']),
+        'plateNumber': masked_plate,
+        'parkingViolation': parking_violation,
+        'congestionDelayMins': latency,
+        'highRisk': bool(row['is_high_risk_violation']),
+        'impactScore': impact_score,
+        'privacyTags': ['license-plate-tokenized', 'identity-redacted'],
+        'position': position,
+    })
+
+demo_stream = {
+    'generatedAt': datetime.utcnow().isoformat() + 'Z',
+    'windowSize': 12,
+    'delayThresholdMins': 15,
+    'parkingThreshold': 5,
+    'events': demo_events,
+}
+save('demo_stream.json', demo_stream)
+
+print(
+    f"\nDone! Generated {len([f for f in os.listdir(OUTPUT_DIR) if f.endswith('.json')])} files in {OUTPUT_DIR}")
 print(f"Frontend compatibility copy updated in {LEGACY_OUTPUT_DIR}")

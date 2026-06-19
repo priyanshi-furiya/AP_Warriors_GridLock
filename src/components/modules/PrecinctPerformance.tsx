@@ -1,5 +1,8 @@
 import { useMemo } from 'react'
 import { motion } from 'motion/react'
+import useLiveFeed from '@/hooks/useLiveFeed'
+import { useAppStore } from '@/stores/appStore'
+import { useDataStore } from '@/stores/dataStore'
 import {
   ScatterChart,
   Scatter,
@@ -11,9 +14,11 @@ import {
   ZAxis,
   Cell,
 } from 'recharts'
-import stationsData from '@/data/real/by_station.json'
 
 export default function PrecinctPerformance() {
+  const stationsData = useDataStore((s) => s.stations)
+  const demoMode = useAppStore((s) => (s as any).demoMode)
+  const feed = useLiveFeed()
   const { scatterData, topPerformers, worstPerformers } = useMemo(() => {
     // Sort stations by approval rate for rankings
     const sorted = [...stationsData].sort((a, b) => b.approvalRate - a.approvalRate)
@@ -57,6 +62,9 @@ export default function PrecinctPerformance() {
         <p className="text-text-secondary text-sm mt-1 max-w-md">
           Station leaderboard evaluating citation volume versus approval accuracy.
         </p>
+        {demoMode && (
+          <div className="mt-3 text-xs font-mono text-text-muted">Live events: <span className="text-lime font-bold">{feed.currentEvents.length}</span></div>
+        )}
       </motion.div>
 
       {/* Leaderboards Grid */}
@@ -162,11 +170,12 @@ export default function PrecinctPerformance() {
               <Tooltip 
                 cursor={{ strokeDasharray: '3 3' }}
                 contentStyle={{ backgroundColor: 'rgba(10,10,10,0.9)', borderColor: 'rgba(255,255,255,0.1)' }}
-                formatter={(value: number, name: string) => {
-                  if (name === 'Volume') return [value.toLocaleString(), 'Total Citations']
-                  if (name === 'Approval Rate') return [`${value}%`, 'Accuracy']
-                  return value
-                }}
+                formatter={((value: any, name: any) => {
+                  const numericValue = Number(value ?? 0)
+                  if (name === 'Volume') return [numericValue.toLocaleString(), 'Total Citations']
+                  if (name === 'Approval Rate') return [`${numericValue}%`, 'Accuracy']
+                  return numericValue
+                }) as any}
                 labelFormatter={() => ''}
               />
               <Scatter name="Stations" data={scatterData}>

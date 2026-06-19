@@ -3,8 +3,10 @@ import { motion, AnimatePresence } from 'motion/react'
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useAppStore } from '@/stores/appStore'
-import { hotspots, getSeverityColor, getSeverityLevel } from '@/data/hotspots'
+import { getSeverityColor, getSeverityLevel } from '@/data/hotspots'
 import type { Hotspot } from '@/data/hotspots'
+import { useDataStore } from '@/stores/dataStore'
+import useLiveFeed from '@/hooks/useLiveFeed'
 
 // ─── Types ───────────────────────────────────────────
 type TimeRange = '1H' | '6H' | '24H' | '7D'
@@ -213,7 +215,10 @@ function MapAutoCenter({ lat, lng }: { lat: number; lng: number }) {
 
 // ─── Main Component ──────────────────────────────────
 export default function HotspotMap() {
+  const hotspots = useDataStore((s) => s.hotspots)
   const { selectedHotspotId, setSelectedHotspot } = useAppStore()
+  const demoMode = useAppStore((s) => (s as any).demoMode)
+  const feed = useLiveFeed()
   const [timeRange, setTimeRange] = useState<TimeRange>('24H')
   const [severityFilters, setSeverityFilters] = useState<Set<SeverityFilter>>(new Set())
 
@@ -376,6 +381,29 @@ export default function HotspotMap() {
                 </CircleMarker>
               )
             })}
+            {demoMode &&
+              feed.currentEvents.map((e) => {
+                const match = hotspots.find((h) => h.name === e.hotspot || h.id === e.hotspot)
+                if (!match) return null
+                const color = '#FF6B35'
+                const radius = Math.max(8, Math.min(30, (e.impactScore ?? 10) / 2))
+                return (
+                  <CircleMarker
+                    key={`live-${e.id}`}
+                    center={[match.lat, match.lng]}
+                    radius={radius}
+                    pathOptions={{ color, fillColor: color, fillOpacity: 0.18, weight: 2 }}
+                  >
+                    <Popup>
+                      <div style={{ fontFamily: 'monospace', color: '#1a1a1a' }}>
+                        <strong>{e.violationType}</strong><br />
+                        <span>{e.plateNumber}</span><br />
+                        <span>{e.hotspot}</span>
+                      </div>
+                    </Popup>
+                  </CircleMarker>
+                )
+              })}
             {selectedHotspot && (
               <MapAutoCenter lat={selectedHotspot.lat} lng={selectedHotspot.lng} />
             )}

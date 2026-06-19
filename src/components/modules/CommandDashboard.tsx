@@ -6,13 +6,8 @@ import {
   BarChart, Bar, Rectangle,
 } from 'recharts';
 
-import summaryData from '@/data/real/summary.json';
-import stationData from '@/data/real/by_station.json';
-import vehicleData from '@/data/real/by_vehicle.json';
-import hourlyData from '@/data/real/by_hour.json';
-import monthlyData from '@/data/real/by_month.json';
-import dayData from '@/data/real/by_day.json';
-import insightsData from '@/data/real/insights.json';
+import { useDataStore } from '@/stores/dataStore';
+import useLiveFeed from '@/hooks/useLiveFeed';
 
 // ─────────── Types ───────────
 interface StationEntry {
@@ -299,6 +294,18 @@ const HourlyBar = (props: HourlyBarProps) => {
 
 // ─────────── Main Component ───────────
 const CommandDashboard = () => {
+  const feed = useLiveFeed();
+  const currentIncident = feed.currentIncident;
+  
+  // Use global data store for dynamically updating metrics
+  const summaryData = useDataStore((s) => s.summary);
+  const stationData = useDataStore((s) => s.stations);
+  const vehicleData = useDataStore((s) => s.vehicles);
+  const hourlyData = useDataStore((s) => s.hourly);
+  const monthlyData = useDataStore((s) => s.monthly);
+  const dayData = useDataStore((s) => s.days);
+  const insightsData = useDataStore((s) => s.insights);
+
   // Filter state
   const [activeClasses, setActiveClasses] = useState<Set<VehicleClassKey>>(new Set(VEHICLE_CLASSES));
   const [dayType, setDayType] = useState<DayType>('all');
@@ -426,6 +433,16 @@ const CommandDashboard = () => {
         <span className="text-text-muted text-xs font-mono shrink-0">
           {summaryData.dateRange.min} — {summaryData.dateRange.max}
         </span>
+        <div className="ml-4 flex items-center gap-2 text-xs font-mono text-text-muted">
+          <span className="w-2 h-2 rounded-full bg-lime shadow-[0_0_8px_rgba(163,255,18,0.6)] animate-pulse" />
+          <span>Live stream</span>
+          <span className="text-lime font-bold">{feed.currentEvents.length}/25</span>
+          {currentIncident && (
+            <span className="text-platinum truncate max-w-[280px]">
+              {currentIncident.violationType} at {currentIncident.hotspot}
+            </span>
+          )}
+        </div>
       </motion.div>
 
       {/* ── KPI Row ── */}

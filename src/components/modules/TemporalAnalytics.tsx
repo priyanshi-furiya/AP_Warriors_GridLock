@@ -4,11 +4,7 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine, ReferenceArea, Cell,
 } from 'recharts'
-import { useApiResource } from '@/lib/api'
-import fallbackHourData from '@/data/real/by_hour.json'
-import fallbackDayData from '@/data/real/by_day.json'
-import fallbackMonthData from '@/data/real/by_month.json'
-import fallbackSummaryData from '@/data/real/summary.json'
+import { useDataStore } from '@/stores/dataStore'
 
 /* ── Types ── */
 interface HourlyEntry {
@@ -44,12 +40,6 @@ interface TemporalPayload {
   months: MonthEntry[]
 }
 
-const fallbackTemporalPayload: TemporalPayload = {
-  hourly: fallbackHourData.hourly as HourlyEntry[],
-  heatmap: fallbackHourData.heatmap as Record<string, number[]>,
-  days: fallbackDayData as DayEntry[],
-  months: fallbackMonthData as MonthEntry[],
-}
 
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const
 const DAY_SHORT: Record<string, string> = {
@@ -118,17 +108,20 @@ function CellTooltip({ day, hour, count, x, y }: {
   )
 }
 
-/* ── Main Component ── */
 export default function TemporalAnalytics() {
   const [hoveredCell, setHoveredCell] = useState<{ day: string; hour: number; x: number; y: number } | null>(null)
   const [selectedRow, setSelectedRow] = useState<string | null>(null)
   const [selectedCol, setSelectedCol] = useState<number | null>(null)
-  const temporalData = useApiResource<TemporalPayload>('/api/temporal', fallbackTemporalPayload)
-  const summaryData = useApiResource<typeof fallbackSummaryData>('/api/summary', fallbackSummaryData)
-  const hourly = temporalData.hourly
-  const heatmap = temporalData.heatmap
-  const days = temporalData.days
-  const months = temporalData.months
+  
+  const hourlyStore = useDataStore(s => s.hourly)
+  const daysStore = useDataStore(s => s.days)
+  const monthsStore = useDataStore(s => s.monthly)
+  const summaryData = useDataStore(s => s.summary)
+
+  const hourly = hourlyStore.hourly as HourlyEntry[]
+  const heatmap = hourlyStore.heatmap as Record<string, number[]>
+  const days = daysStore as DayEntry[]
+  const months = monthsStore as MonthEntry[]
   const coverageLabel = `${summaryData.dateRange.min} to ${summaryData.dateRange.max}`
 
   /* ── Derived data ── */

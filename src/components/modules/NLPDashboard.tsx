@@ -17,14 +17,8 @@ import {
   CartesianGrid,
 } from 'recharts';
 
-import summaryData from '@/data/real/summary.json';
-import stationData from '@/data/real/by_station.json';
-import vehicleData from '@/data/real/by_vehicle.json';
-import hourData from '@/data/real/by_hour.json';
-import dayData from '@/data/real/by_day.json';
-import monthData from '@/data/real/by_month.json';
+import { useDataStore } from '@/stores/dataStore';
 import violationTypeData from '@/data/real/by_violation_type.json';
-import insightsData from '@/data/real/insights.json';
 
 // ─── Types ──────────────────────────────────────────────────
 interface QueryResult {
@@ -121,6 +115,14 @@ const SparkleIcon = () => (
 // ─── Query Engine ───────────────────────────────────────────
 function parseQueryLocal(query: string): QueryResult {
   const q = query.toLowerCase().trim();
+  const store = useDataStore.getState();
+  const summaryData = store.summary;
+  const stationData = store.stations;
+  const vehicleData = store.vehicles;
+  const hourData = store.hourly;
+  const dayData = store.days;
+  const monthData = store.monthly;
+  const insightsData = store.insights;
 
   // 1. SPECIFIC POLICE STATION PROFILES
   // Match police station names from Bangalore dataset
@@ -458,31 +460,31 @@ async function parseQueryAI(query: string): Promise<QueryResult> {
 
   const promptContext = `
 You are GridLock AI, a smart city traffic analyst AI.
-You have access to the following pre-aggregated traffic violations dataset for Bangalore (covering Nov 2023 - Apr 2024 with 292,649 records):
+You have access to the following pre-aggregated traffic violations dataset for Bangalore:
 
 1. High-Level Summary (summaryData):
-${JSON.stringify(summaryData)}
+${JSON.stringify(useDataStore.getState().summary)}
 
 2. Station-Level Aggregation (stationData):
-${JSON.stringify(stationData)}
+${JSON.stringify(useDataStore.getState().stations)}
 
 3. Vehicle Class Aggregation (vehicleData):
-${JSON.stringify(vehicleData)}
+${JSON.stringify(useDataStore.getState().vehicles)}
 
 4. Hourly Pattern (hourData):
-${JSON.stringify(hourData)}
+${JSON.stringify(useDataStore.getState().hourly)}
 
 5. Day-of-Week Aggregation (dayData):
-${JSON.stringify(dayData)}
+${JSON.stringify(useDataStore.getState().days)}
 
 6. Monthly Aggregation (monthData):
-${JSON.stringify(monthData)}
+${JSON.stringify(useDataStore.getState().monthly)}
 
 7. Violation Type Aggregation (violationTypeData):
 ${JSON.stringify(violationTypeData)}
 
 8. Pre-computed Insights (insightsData):
-${JSON.stringify(insightsData)}
+${JSON.stringify(useDataStore.getState().insights)}
 
 Given the user's natural language question: "${query}"
 
@@ -716,6 +718,7 @@ const InsightsGrid = ({ data }: { data: any[] }) => {
 
 // ─── Main Component ─────────────────────────────────────────
 const NLPDashboard = () => {
+  const summaryData = useDataStore((s) => s.summary);
   const [query, setQuery] = useState('');
   const [submittedQuery, setSubmittedQuery] = useState('');
   const [result, setResult] = useState<QueryResult | null>(null);

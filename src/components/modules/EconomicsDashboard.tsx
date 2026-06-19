@@ -12,11 +12,12 @@ import {
   Pie,
   Cell,
 } from 'recharts'
-import { violations } from '@/data/violations'
+import { useDataStore } from '@/stores/dataStore'
 
 const COLORS = ['#A3FF12', '#FBBF24', '#DC2626', '#FF6B35']
 
 export default function EconomicsDashboard() {
+  const violations = useDataStore((s) => s.violations)
   const { totalRevenue, potentialRevenue, statusChart, vehicleChart, topHotspots } = useMemo(() => {
     let totalRev = 0
     let potentialRev = 0
@@ -57,7 +58,7 @@ export default function EconomicsDashboard() {
       vehicleChart: vChart,
       topHotspots: topH,
     }
-  }, [])
+  }, [violations])
 
   const collectionRate = potentialRevenue > 0 ? ((totalRevenue / potentialRevenue) * 100).toFixed(1) : '0'
 
@@ -145,7 +146,7 @@ export default function EconomicsDashboard() {
                 <Tooltip
                   contentStyle={{ backgroundColor: 'rgba(10,10,10,0.9)', borderColor: 'rgba(255,255,255,0.1)' }}
                   itemStyle={{ color: '#E5E7EB' }}
-                  formatter={(value: number) => `₹${value.toLocaleString('en-IN')}`}
+                  formatter={((value: any) => `₹${Number(value ?? 0).toLocaleString('en-IN')}`) as any}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -177,7 +178,7 @@ export default function EconomicsDashboard() {
                 <Tooltip
                   cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                   contentStyle={{ backgroundColor: 'rgba(10,10,10,0.9)', borderColor: 'rgba(255,255,255,0.1)' }}
-                  formatter={(value: number) => `₹${value.toLocaleString('en-IN')}`}
+                  formatter={((value: any) => `₹${Number(value ?? 0).toLocaleString('en-IN')}`) as any}
                 />
                 <Bar dataKey="value" fill="#A3FF12" radius={[0, 4, 4, 0]} />
               </BarChart>
