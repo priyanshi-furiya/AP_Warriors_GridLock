@@ -170,11 +170,11 @@ export default function ControlRoom() {
   }
 
   return (
-    <div className="w-full min-h-[calc(100vh-3rem)] bg-bg-primary p-5 lg:p-8 overflow-y-auto">
+    <div className="w-full h-[calc(100vh-3rem)] bg-bg-primary p-5 lg:p-8 flex flex-col overflow-hidden">
       <motion.div
         initial={{ opacity: 0, y: -16 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-6 flex flex-col gap-2"
+        className="mb-6 flex flex-col gap-2 shrink-0"
       >
         <span className="text-lime text-[10px] font-mono font-bold tracking-[0.3em] uppercase">
           Continuous Sensing Demo
@@ -187,12 +187,12 @@ export default function ControlRoom() {
         </p>
       </motion.div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-5">
-        <div className="space-y-5">
+      <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-5 flex-1 min-h-0">
+        <div className="flex flex-col gap-5 overflow-y-auto xl:overflow-hidden">
           <motion.section
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            className="glass-panel p-5 hud-corner"
+            className="glass-panel p-5 hud-corner shrink-0"
           >
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
               <div>
@@ -357,9 +357,9 @@ export default function ControlRoom() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="glass-panel p-5 hud-corner"
+            className="glass-panel p-5 hud-corner flex-1 flex flex-col min-h-0"
           >
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4 shrink-0">
               <div>
                 <p className="text-text-muted text-[10px] uppercase tracking-[0.25em]">Live Events</p>
                 <h2 className="text-platinum font-semibold text-lg">Streaming incidents</h2>
@@ -367,7 +367,7 @@ export default function ControlRoom() {
               <span className="font-mono text-xs text-text-muted">{demoStreamMeta.generatedAt}</span>
             </div>
 
-            <div className="space-y-3 max-h-[460px] overflow-y-auto pr-1">
+            <div className="space-y-3 flex-1 overflow-y-auto pr-1">
               {liveStream.slice().reverse().map((event) => (
                 <div key={event.id} className="glass-card p-4 rounded-xl border border-white/5 flex flex-col md:flex-row md:items-center gap-3">
                   <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: severityColor(event.impactScore), boxShadow: `0 0 10px ${severityColor(event.impactScore)}55` }} />
@@ -389,11 +389,11 @@ export default function ControlRoom() {
           </motion.section>
         </div>
 
-        <div className="space-y-5">
+        <div className="flex flex-col gap-5 overflow-y-auto xl:overflow-hidden">
           <motion.section
             initial={{ opacity: 0, x: 16 }}
             animate={{ opacity: 1, x: 0 }}
-            className="glass-panel p-5 hud-corner"
+            className="glass-panel p-5 hud-corner shrink-0"
           >
             <p className="text-text-muted text-[10px] uppercase tracking-[0.25em] mb-2">Interactive Command Center</p>
             <h2 className="text-platinum font-semibold text-lg mb-4">Stay present while the stream keeps moving</h2>
@@ -449,7 +449,7 @@ export default function ControlRoom() {
             initial={{ opacity: 0, x: 16 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.1 }}
-            className="glass-panel p-5 hud-corner"
+            className="glass-panel p-5 hud-corner shrink-0"
           >
             <p className="text-text-muted text-[10px] uppercase tracking-[0.25em] mb-2">Two-Model Narrative</p>
             <div className="space-y-3 text-sm text-text-secondary leading-relaxed">

@@ -21,7 +21,6 @@ const StatusBar = lazy(() => import('@/components/layout/StatusBar'))
 const CommandDock = lazy(() => import('@/components/layout/CommandDock'))
 const LiveSupervisor = lazy(() => import('@/components/shared/LiveSupervisor'))
 const AlertPanel = lazy(() => import('@/components/shared/AlertPanel'))
-const PrivacySentinel = lazy(() => import('@/components/shared/PrivacySentinel'))
 
 const NlpQueryModule = lazy(() => import('@/components/modules/NLPDashboard'))
 const LandingSequence = lazy(() => import('@/components/landing/LandingSequence'))
@@ -156,7 +155,6 @@ export default function App() {
           <Suspense fallback={null}>
             <LiveSupervisor />
             <AlertPanel />
-            <PrivacySentinel />
           </Suspense>
 
           {/* Main Content Area */}

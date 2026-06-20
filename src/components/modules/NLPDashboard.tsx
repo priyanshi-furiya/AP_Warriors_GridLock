@@ -1,6 +1,5 @@
 /// <reference types="vite/client" />
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   BarChart,
@@ -16,7 +15,6 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from 'recharts';
-
 import { useDataStore } from '@/stores/dataStore';
 import violationTypeData from '@/data/real/by_violation_type.json';
 
@@ -446,17 +444,12 @@ function parseQueryLocal(query: string): QueryResult {
   };
 }
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const MISTRAL_API_KEY = import.meta.env.VITE_MISTRAL_API_KEY;
 
 async function parseQueryAI(query: string): Promise<QueryResult> {
-  if (!GEMINI_API_KEY) {
-    throw new Error('VITE_GEMINI_API_KEY is not set in .env file');
+  if (!MISTRAL_API_KEY) {
+    throw new Error('VITE_MISTRAL_API_KEY is not set in .env file');
   }
-  const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
-    generationConfig: { responseMimeType: 'application/json' },
-  });
 
   const promptContext = `
 You are GridLock AI, a smart city traffic analyst AI.
@@ -508,8 +501,28 @@ Guidelines for data format:
 - Ensure your response is strictly valid JSON and nothing else. Do not wrap in markdown code blocks like \`\`\`json.
 `;
 
-  const result = await model.generateContent(promptContext);
-  const text = result.response.text();
+  const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${MISTRAL_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: "mistral-large-latest",
+      messages: [
+        { role: "system", content: "You are GridLock AI, a smart city traffic analyst AI. Always respond with valid JSON." },
+        { role: "user", content: promptContext }
+      ],
+      response_format: { type: "json_object" }
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Mistral API error: ${response.status} ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  const text = data.choices[0].message.content;
   
   let cleanText = text.trim();
   if (cleanText.startsWith('```json')) {
@@ -732,19 +745,18 @@ const NLPDashboard = () => {
     setIsProcessing(true);
     setResult(null);
 
-    // Use local parser immediately for instant response
-    const localResult = parseQueryLocal(q);
-    setResult(localResult);
-    setIsProcessing(false);
-
-    // Optionally enhance with server response in background
     try {
       const serverResult = await parseQueryAI(q);
       if (serverResult && serverResult.data?.length > 0) {
         setResult(serverResult);
+      } else {
+        setResult(parseQueryLocal(q));
       }
-    } catch {
-      // Server unavailable — local result already shown, no action needed
+    } catch (err) {
+      console.error("AI Query failed:", err);
+      setResult(parseQueryLocal(q));
+    } finally {
+      setIsProcessing(false);
     }
   }, []);
 

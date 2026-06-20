@@ -90,8 +90,12 @@ export const useDataStore = create<DataState>((set) => ({
       vehicles.byType[vTypeIndex].count += 1
     }
 
+    // Use current time for the live event so it appears at the top of the timeline
+    const now = new Date()
+    const currentTimestamp = now.toISOString()
+
     // 4. Update hourly
-    const eventDate = new Date(event.timestamp)
+    const eventDate = now
     const hour = eventDate.getHours()
     const hourIndex = hourly.hourly.findIndex(h => h.hour === hour)
     if (hourIndex !== -1) {
@@ -123,8 +127,8 @@ export const useDataStore = create<DataState>((set) => ({
 
     // 6. Update violations (add to top)
     const newViolation: Violation = {
-      id: event.id,
-      timestamp: event.timestamp,
+      id: event.id + '-' + Date.now(),
+      timestamp: currentTimestamp,
       location: event.location || 'Unknown Location',
       hotspotId: event.hotspot || 'unknown-hotspot', // map from hotspot name to ID or use as is
       vehicleType: event.vehicleClass === '2W' ? 'Scooter' : event.vehicleClass === '3W' ? 'Auto' : event.vehicleClass === 'CAR' ? 'Car' : event.vehicleClass === 'HV' ? 'Truck' : 'Bus',
@@ -149,7 +153,7 @@ export const useDataStore = create<DataState>((set) => ({
     }
 
     // 8. Update zones
-    const zoneIndex = zones.findIndex(z => z.stationName === event.station)
+    const zoneIndex = zones.findIndex(z => z.name === event.station || z.stationName === event.station || z.stationName.startsWith(event.station || ''))
     if (zoneIndex !== -1) {
       zones[zoneIndex].stats.totalViolations += 1
       const vTypeLower = newViolation.vehicleType.toLowerCase() + 's'

@@ -192,12 +192,14 @@ export default function CommandDock() {
 
       {/* ── Live Status + Collapse Toggle ── */}
       <div className="flex-shrink-0 border-t border-t-[rgba(163,255,18,0.08)] p-3 space-y-2">
-        <div className="flex items-center gap-2 rounded-lg border border-lime/10 bg-lime/5 px-3 py-2">
-          <span className="w-2 h-2 rounded-full bg-lime shadow-[0_0_8px_rgba(163,255,18,0.6)] animate-pulse" />
-          <div className="min-w-0">
-            <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-text-muted">Live stream</div>
-            <div className="text-xs font-mono text-platinum truncate">Last 25 incidents active</div>
-          </div>
+        <div className={`flex items-center ${sidebarCollapsed ? 'justify-center px-0' : 'gap-2 px-3'} rounded-lg border border-lime/10 bg-lime/5 py-2`}>
+          <span className="w-2 h-2 rounded-full bg-lime shadow-[0_0_8px_rgba(163,255,18,0.6)] animate-pulse flex-shrink-0" />
+          {!sidebarCollapsed && (
+            <div className="min-w-0">
+              <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-text-muted truncate">Live stream</div>
+              <div className="text-xs font-mono text-platinum truncate">Last 25 incidents active</div>
+            </div>
+          )}
         </div>
         <button
           onClick={toggleSidebar}

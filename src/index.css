@@ -104,21 +104,31 @@ body {
 }
 
 /* ─────────── Scrollbar ─────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(163, 255, 18, 0.2) transparent;
+}
+
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
+  height: 4px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #07070B;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
   background: rgba(163, 255, 18, 0.2);
-  border-radius: 3px;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(163, 255, 18, 0.4);
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 2px;
 }
 
 /* ─────────── Glass Utilities ─────────── */

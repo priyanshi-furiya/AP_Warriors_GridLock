@@ -46,6 +46,7 @@ interface AppState {
   setDemoMode: (v: boolean) => void
   addAlert: (a: { id?: string; title: string; message: string; level?: 'info' | 'warning' | 'critical' }) => void
   dismissAlert: (id: string) => void
+  clearAlerts: () => void
   setMobileMenuOpen: (open: boolean) => void
   toggleMobileMenu: () => void
   setGlobalFilters: (filters: Partial<GlobalFilters>) => void
@@ -81,6 +82,7 @@ export const useAppStore = create<AppState>((set) => ({
       return { alerts: next }
     }),
   dismissAlert: (id) => set((state) => ({ alerts: state.alerts.filter((x) => x.id !== id) })),
+  clearAlerts: () => set({ alerts: [] }),
   setSelectedHotspot: (id) => set({ selectedHotspotId: id }),
   setSelectedZone: (id) => set({ selectedZoneId: id }),
   setIsTransitioning: (transitioning) => set({ isTransitioning: transitioning }),
