@@ -240,7 +240,7 @@ export default function IncidentExplorer() {
     }
 
     return sorted
-  }, [searchQuery, vehicleFilters, statusFilters, sortBy])
+  }, [searchQuery, vehicleFilters, statusFilters, sortBy, violations])
 
   const displayedViolations = filteredViolations.slice(0, visibleCount)
   const hasMore = visibleCount < filteredViolations.length

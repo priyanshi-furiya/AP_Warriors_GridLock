@@ -151,7 +151,7 @@ export default function ControlRoom() {
       delay: peakDelay,
       route: patrolRoutes[0].name,
     }
-  }, [activeAlert, liveStream, stationCounts, visibleCount])
+  }, [activeAlert, liveStream, stationCounts, visibleCount, patrolRoutes])
 
   const heatColor = severityColor(heatValue)
   const response = getQueryResponse(selectedQuery, activeAlert, liveStream)

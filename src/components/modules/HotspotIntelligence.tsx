@@ -337,7 +337,7 @@ export default function HotspotIntelligence() {
         h.zone.toLowerCase().includes(q) ||
         h.topViolations.some((v) => v.toLowerCase().includes(q))
     )
-  }, [searchQuery])
+  }, [searchQuery, hotspots])
 
   return (
     <motion.div

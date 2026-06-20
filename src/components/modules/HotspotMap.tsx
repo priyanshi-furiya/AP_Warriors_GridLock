@@ -241,7 +241,7 @@ export default function HotspotMap() {
   const filteredHotspots = useMemo(() => {
     if (severityFilters.size === 0) return hotspots
     return hotspots.filter((h) => severityFilters.has(getSeverityLevel(h.severity)))
-  }, [severityFilters])
+  }, [severityFilters, hotspots])
 
   const selectedHotspot = hotspots.find((h) => h.id === selectedHotspotId) || null
 

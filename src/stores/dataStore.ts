@@ -62,20 +62,32 @@ export const useDataStore = create<DataState>((set) => ({
     // 1. Update summary
     summary.totalViolations += 1
 
+    const uiToRawClass: Record<string, string> = {
+      'Car': 'CAR',
+      'Scooter': '2W',
+      'Auto': '3W',
+      'Bus': 'BUS',
+      'Truck': 'HV'
+    }
+    const rawClass = uiToRawClass[event.vehicleClass || ''] || 'CAR'
+
     // 2. Update stations
     const stationIndex = stations.findIndex(s => s.name === event.station)
     if (stationIndex !== -1) {
       stations[stationIndex].totalViolations += 1
-      const vClass = event.vehicleClass as keyof typeof stations[0]['vehicleClass']
-      if (vClass && stations[stationIndex].vehicleClass[vClass] !== undefined) {
-        stations[stationIndex].vehicleClass[vClass] += 1
+      if (rawClass && stations[stationIndex].vehicleClass[rawClass as keyof typeof stations[0]['vehicleClass']] !== undefined) {
+        stations[stationIndex].vehicleClass[rawClass as keyof typeof stations[0]['vehicleClass']] += 1
       }
     }
 
     // 3. Update vehicles
-    const vClassIndex = vehicles.byClass.findIndex(v => v.vehicleClass === event.vehicleClass)
+    const vClassIndex = vehicles.byClass.findIndex(v => v.vehicleClass === rawClass)
     if (vClassIndex !== -1) {
       vehicles.byClass[vClassIndex].count += 1
+    }
+    const vTypeIndex = vehicles.byType.findIndex(v => v.vehicleType === event.vehicleClass) // Note: vehicleType mapping might be rough, but we do best effort
+    if (vTypeIndex !== -1) {
+      vehicles.byType[vTypeIndex].count += 1
     }
 
     // 4. Update hourly
@@ -84,6 +96,19 @@ export const useDataStore = create<DataState>((set) => ({
     const hourIndex = hourly.hourly.findIndex(h => h.hour === hour)
     if (hourIndex !== -1) {
       hourly.hourly[hourIndex].count += 1
+    }
+    const fullDaysMap = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    const fullDay = fullDaysMap[eventDate.getDay()] as keyof typeof hourly.heatmap
+    if (hourly.heatmap && hourly.heatmap[fullDay]) {
+      hourly.heatmap[fullDay][hour] += 1
+    }
+
+    // 4.5 Update monthly
+    const year = eventDate.getFullYear()
+    const month = eventDate.getMonth() + 1
+    const monthIndex = monthly.findIndex(m => m.year === year && m.month === month)
+    if (monthIndex !== -1) {
+      monthly[monthIndex].count += 1
     }
     
     // 5. Update days

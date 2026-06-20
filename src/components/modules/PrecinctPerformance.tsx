@@ -36,7 +36,7 @@ export default function PrecinctPerformance() {
     }))
 
     return { scatterData: sData, topPerformers: top, worstPerformers: worst }
-  }, [])
+  }, [stationsData])
 
   const getBubbleColor = (approvalRate: number) => {
     if (approvalRate >= 75) return '#A3FF12' // Lime

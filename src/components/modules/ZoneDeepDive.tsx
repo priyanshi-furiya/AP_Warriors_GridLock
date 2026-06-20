@@ -54,7 +54,7 @@ export default function ZoneDeepDive() {
 
   const selectedZone = useMemo(
     () => zones.find((z) => z.id === selectedZoneId) ?? null,
-    [selectedZoneId],
+    [selectedZoneId, zones],
   )
 
   return (

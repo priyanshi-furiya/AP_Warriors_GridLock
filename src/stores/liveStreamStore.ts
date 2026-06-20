@@ -62,8 +62,8 @@ export function startLiveStream() {
   if (timerStarted || typeof window === 'undefined') return
   timerStarted = true
 
-  // 120000 ms = 2 minutes as requested
-  const stepMs = 120000
+  // 30000 ms = 30 seconds
+  const stepMs = 30000
   window.setInterval(advanceStream, stepMs)
 }
 

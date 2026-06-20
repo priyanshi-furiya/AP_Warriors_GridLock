@@ -144,7 +144,7 @@ export default function EnforcementRoutes() {
       }).filter(Boolean) as [number, number][]
       return { ...route, coords }
     })
-  }, [])
+  }, [patrolRoutes, hotspots])
 
   const selectedRoute = useMemo(
     () => routesWithCoords.find((r) => r.id === selectedRouteId) ?? routesWithCoords[0],
@@ -175,7 +175,7 @@ export default function EnforcementRoutes() {
         const hs = hotspots.find((h) => h.name === name)
         return { name, severity: hs?.severity ?? 50, violationCount: hs?.violationCount ?? 0, lat: hs?.lat ?? 12.97, lng: hs?.lng ?? 77.59 }
       }),
-    [selectedRoute],
+    [selectedRoute, hotspots],
   )
 
   const totalCoverage = Math.round(

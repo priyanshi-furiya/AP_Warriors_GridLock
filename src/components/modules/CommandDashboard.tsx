@@ -327,7 +327,7 @@ const CommandDashboard = () => {
     return (vehicleData.byClass as VehicleClassEntry[]).filter(v =>
       activeClasses.has(v.vehicleClass as VehicleClassKey)
     );
-  }, [activeClasses]);
+  }, [activeClasses, vehicleData]);
 
   const filteredVehicleTotal = useMemo(
     () => filteredVehicleData.reduce((s, v) => s + v.count, 0),
@@ -350,14 +350,14 @@ const CommandDashboard = () => {
       return { ...s, filteredViolations: dayAdjusted };
     });
     return stations.sort((a, b) => b.filteredViolations - a.filteredViolations).slice(0, 15);
-  }, [activeClasses, dayType]);
+  }, [activeClasses, dayType, stationData]);
 
   const filteredDayData = useMemo(() => {
     const days = dayData as DayEntry[];
     if (dayType === 'weekday') return days.filter(d => !d.isWeekend);
     if (dayType === 'weekend') return days.filter(d => d.isWeekend);
     return days;
-  }, [dayType]);
+  }, [dayType, dayData]);
 
   const filteredMonthlyData = useMemo(() => {
     const months = monthlyData as MonthEntry[];
@@ -368,7 +368,7 @@ const CommandDashboard = () => {
       return months.map(m => ({ ...m, count: m.count - m.weekendCount }));
     }
     return months;
-  }, [dayType]);
+  }, [dayType, monthlyData]);
 
   const hourlyEntries = hourlyData.hourly as HourlyEntry[];
   const maxHourlyCount = Math.max(...hourlyEntries.map(h => h.count));
