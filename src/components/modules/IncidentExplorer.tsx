@@ -48,7 +48,7 @@ const SEVERITY_MAP: Record<string, { color: string; level: number }> = {
 type SortKey = 'time' | 'amount' | 'severity'
 
 function getRelativeTime(timestamp: string): string {
-  const now = new Date('2026-06-16T22:00:00')
+  const now = new Date()
   const then = new Date(timestamp)
   const diffMs = now.getTime() - then.getTime()
   const diffH = Math.floor(diffMs / (1000 * 60 * 60))
@@ -419,7 +419,7 @@ export default function IncidentExplorer() {
                 bg-lime/5 hover:bg-lime/10 transition-all duration-200 font-mono"
               style={{ boxShadow: '0 0 16px rgba(163,255,18,0.06)' }}
             >
-              Load More ({Math.min(ITEMS_PER_PAGE, filteredViolations.length - visibleCount)} remaining of {filteredViolations.length - visibleCount})
+              Load {Math.min(ITEMS_PER_PAGE, filteredViolations.length - visibleCount)} more ({filteredViolations.length - visibleCount} remaining)
             </button>
           </motion.div>
         )}

@@ -56,7 +56,7 @@ export default function CongestionPredictor() {
       const result = predictions.predict(selectedJunction, selectedHour)
       setPredictionResult(result)
       setIsPredicting(false)
-    }, 900)
+    }, 100)
   }
 
   /* congestion arc */
@@ -79,7 +79,7 @@ export default function CongestionPredictor() {
           Congestion <span className="text-gradient-lime">Predictor</span>
         </h1>
         <p className="text-text-secondary text-sm mt-1 max-w-md">
-          AI-powered traffic forecasting — select a junction &amp; hour to predict violations.
+          Rule-based traffic forecasting using Bangalore enforcement patterns — select a junction &amp; hour to predict congestion.
         </p>
         {demoMode && (
           <div className="mt-3 text-xs font-mono text-text-muted">Live events: <span className="text-lime font-bold">{liveCount}</span></div>
@@ -175,7 +175,7 @@ export default function CongestionPredictor() {
               >
                 <div className="flex flex-col items-center gap-4">
                   <div className="w-16 h-16 rounded-full border-2 border-lime/30 border-t-lime animate-spin" />
-                  <p className="text-text-secondary text-sm">Running neural model…</p>
+                  <p className="text-text-secondary text-sm">Computing prediction…</p>
                 </div>
               </motion.div>
             )}
@@ -354,15 +354,15 @@ export default function CongestionPredictor() {
         >
           <div className="glass-panel p-5 space-y-5">
             <h3 className="text-text-muted text-[10px] uppercase tracking-[0.3em]">
-              Model Information
+              Predictor Information
             </h3>
 
             {[
-              { label: 'Model', value: 'GridLock Neural v3.2' },
-              { label: 'Accuracy', value: '94.7%' },
-              { label: 'Last Trained', value: '2h ago' },
-              { label: 'Training Data', value: '2.4M records' },
-              { label: 'Inference', value: '~120ms' },
+              { label: 'Method', value: 'Historical Pattern Matching' },
+              { label: 'Data Coverage', value: `${predictions.junctions?.length ?? 0} junctions` },
+              { label: 'Granularity', value: 'Hourly · 24h window' },
+              { label: 'Source', value: 'Bangalore Traffic Records' },
+              { label: 'Period', value: 'Nov 2023 – Apr 2024' },
             ].map((item, i) => (
               <motion.div
                 key={item.label}
@@ -375,24 +375,23 @@ export default function CongestionPredictor() {
               </motion.div>
             ))}
 
-            {/* Accuracy gauge */}
+            {/* Data Coverage gauge */}
             <div className="pt-2">
               <p className="text-text-muted text-[10px] uppercase tracking-widest mb-2">
-                Historical Accuracy
+                Junction Coverage
               </p>
               <div className="w-full h-2 rounded-full bg-bg-secondary/60 border border-border/40 overflow-hidden">
                 <motion.div
                   className="h-full rounded-full bg-gradient-to-r from-lime to-green"
                   initial={{ width: 0 }}
-                  animate={{ width: '94.7%' }}
+                  animate={{ width: '100%' }}
                   transition={{ delay: 0.8, duration: 1 }}
                   style={{ boxShadow: '0 0 8px rgba(163,255,18,0.3)' }}
                 />
               </div>
               <div className="flex justify-between mt-1">
-                <span className="font-mono text-[10px] text-text-muted">0%</span>
-                <span className="font-mono text-[10px] text-lime">94.7%</span>
-                <span className="font-mono text-[10px] text-text-muted">100%</span>
+                <span className="font-mono text-[10px] text-text-muted">0</span>
+                <span className="font-mono text-[10px] text-lime">{predictions.junctions?.length ?? 0} junctions</span>
               </div>
             </div>
 
@@ -400,11 +399,11 @@ export default function CongestionPredictor() {
             <div className="flex flex-wrap gap-2 pt-2">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green/10 border border-green/20 text-green text-[10px] font-mono">
                 <span className="w-1.5 h-1.5 rounded-full bg-green animate-pulse" />
-                Model Online
+                Predictor Ready
               </span>
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-lime/10 border border-lime/20 text-lime text-[10px] font-mono">
                 <span className="w-1.5 h-1.5 rounded-full bg-lime" />
-                GPU Accelerated
+                Data-Driven
               </span>
             </div>
           </div>

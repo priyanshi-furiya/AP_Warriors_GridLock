@@ -466,7 +466,7 @@ export default function TemporalAnalytics() {
           <p className="text-xs text-text-muted mb-4">
             <span className="text-lime">■</span> Weekday &nbsp;
             <span className="text-amber">■</span> Weekend &nbsp;
-            <span className="text-orange">—</span> Approval Rate
+            <span className="text-orange">—</span> Avg Violations
           </p>
           <div className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -512,14 +512,7 @@ export default function TemporalAnalytics() {
                     />
                   ))}
                 </Bar>
-                {/* Approval rate reference lines */}
-                {dayChartData.map((entry, idx) => (
-                  <ReferenceLine
-                    key={idx}
-                    y={entry.approvalRate * 600}
-                    stroke="transparent"
-                  />
-                ))}
+
                 {/* Average approval rate line */}
                 <ReferenceLine
                   y={days.reduce((s, d) => s + d.count, 0) / days.length}
@@ -527,7 +520,7 @@ export default function TemporalAnalytics() {
                   strokeDasharray="6 4"
                   strokeWidth={1.5}
                   label={{
-                    value: 'Avg',
+                    value: 'Avg Violations',
                     position: 'right',
                     fill: '#FF6B35',
                     fontSize: 10,

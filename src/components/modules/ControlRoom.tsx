@@ -183,7 +183,7 @@ export default function ControlRoom() {
           Control <span className="text-gradient-lime">Room</span>
         </h1>
         <p className="text-text-secondary text-sm max-w-2xl">
-          A live CSV-to-stream simulation that keeps the interaction layer responsive while the background model aggregates heat, privacy, and dispatch signals.
+          A streaming replay of real Bangalore enforcement records, triggering dispatch alerts based on congestion and parking thresholds in real time.
         </p>
       </motion.div>
 
@@ -197,7 +197,7 @@ export default function ControlRoom() {
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
               <div>
                 <p className="text-text-muted text-[10px] uppercase tracking-[0.25em]">Live Stream</p>
-                <h2 className="text-platinum font-semibold text-lg">Micro-turn ingestion</h2>
+                <h2 className="text-platinum font-semibold text-lg">Live Event Replay</h2>
               </div>
               <div className="flex items-center gap-2 text-xs font-mono">
                 <span className="w-2 h-2 rounded-full bg-lime animate-pulse-glow" />
@@ -451,11 +451,11 @@ export default function ControlRoom() {
             transition={{ delay: 0.1 }}
             className="glass-panel p-5 hud-corner shrink-0"
           >
-            <p className="text-text-muted text-[10px] uppercase tracking-[0.25em] mb-2">Two-Model Narrative</p>
+            <p className="text-text-muted text-[10px] uppercase tracking-[0.25em] mb-2">How It Works</p>
             <div className="space-y-3 text-sm text-text-secondary leading-relaxed">
-              <p><span className="text-lime font-semibold">Interaction model:</span> accepts live questions and interruptions without blocking the feed.</p>
-              <p><span className="text-amber font-semibold">Background model:</span> accumulates the arriving turns into a heat surface, trigger logic, and dispatch context.</p>
-              <p><span className="text-platinum font-semibold">Privacy sentinel:</span> converts raw identifiers into tokens before the event reaches the dashboard, keeping the demo safe to show publicly.</p>
+              <p><span className="text-lime font-semibold">Live feed:</span> real Bangalore traffic enforcement records streamed at 30-second intervals, simulating actual enforcement activity across the city's zones.</p>
+              <p><span className="text-amber font-semibold">Alert engine:</span> accumulates arriving events and fires dispatch alerts when congestion, parking, or signal violation thresholds are exceeded.</p>
+              <p><span className="text-platinum font-semibold">Query interface:</span> keyword-based command center for querying current feed state — route status, congestion levels, and system health.</p>
             </div>
           </motion.section>
         </div>

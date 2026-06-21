@@ -78,7 +78,7 @@ export default function EconomicsDashboard() {
           Economics & <span className="text-gradient-lime">Revenue Tracker</span>
         </h1>
         <p className="text-text-secondary text-sm mt-1 max-w-md">
-          Real-time financial impact of traffic enforcement and fine collection.
+          Estimated financial impact of traffic enforcement based on standard Bangalore fine schedules.
         </p>
       </motion.div>
 
@@ -93,6 +93,7 @@ export default function EconomicsDashboard() {
         >
           <h3 className="text-text-muted text-xs uppercase tracking-widest mb-2">Collected Revenue</h3>
           <p className="text-3xl font-display font-bold text-lime">₹{totalRevenue.toLocaleString('en-IN')}</p>
+          <p className="text-[10px] text-text-muted mt-1">*estimated from fine schedules</p>
         </motion.div>
 
         <motion.div
@@ -104,6 +105,7 @@ export default function EconomicsDashboard() {
         >
           <h3 className="text-text-muted text-xs uppercase tracking-widest mb-2">Total Potential</h3>
           <p className="text-3xl font-display font-bold text-amber">₹{potentialRevenue.toLocaleString('en-IN')}</p>
+          <p className="text-[10px] text-text-muted mt-1">*if all violations collected</p>
         </motion.div>
 
         <motion.div

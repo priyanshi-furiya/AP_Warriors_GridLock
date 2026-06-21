@@ -285,7 +285,7 @@ export default function EnforcementRoutes() {
           animate={{ x: 0, opacity: 1 }}
           transition={{ duration: 0.6, ease: 'easeOut' }}
         >
-          {/* AI badge */}
+          {/* Route badge */}
           <div className="flex items-center gap-2 px-1">
             <div
               className="px-3 py-1 rounded-full text-xs font-semibold font-mono text-lime border border-lime/20"
@@ -294,9 +294,9 @@ export default function EnforcementRoutes() {
                 background: 'rgba(163,255,18,0.06)',
               }}
             >
-              ⚡ AI OPTIMIZED
+              ⚙️ Data-Driven Routes
             </div>
-            <span className="text-text-muted text-xs">Routes auto-generated</span>
+            <span className="text-text-muted text-xs">Ranked by violation density</span>
           </div>
 
           {/* Route selector */}
@@ -353,7 +353,7 @@ export default function EnforcementRoutes() {
                     {selectedRoute.coverage}% Optimal
                   </span>
                   <span className="text-[10px] text-text-secondary">
-                    Dynamic pathing applied
+                    OSRM road routing
                   </span>
                 </div>
               </div>

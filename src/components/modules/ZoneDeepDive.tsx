@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { useAppStore } from '@/stores/appStore'
 import { useDataStore } from '@/stores/dataStore'
@@ -51,11 +51,20 @@ export default function ZoneDeepDive() {
   const zones = useDataStore((s) => s.zones)
   const selectedZoneId = useAppStore((s) => s.selectedZoneId)
   const setSelectedZone = useAppStore((s) => s.setSelectedZone)
+  const setActiveModule = useAppStore((s) => s.setActiveModule)
+  const [deployed, setDeployed] = useState<string | null>(null)
 
   const selectedZone = useMemo(
     () => zones.find((z) => z.id === selectedZoneId) ?? null,
     [selectedZoneId, zones],
   )
+
+  const handleDeploy = (zone: Zone) => {
+    setDeployed(zone.id)
+    setTimeout(() => {
+      setActiveModule('patrols')
+    }, 800)
+  }
 
   return (
     <div className="relative w-full bg-bg-primary p-6 lg:p-10 overflow-y-auto" style={{ minHeight: 'calc(100vh - 3rem)' }}>
@@ -384,11 +393,14 @@ export default function ZoneDeepDive() {
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.97 }}
-                  className="w-full py-3 rounded-xl font-display font-bold text-sm tracking-wide bg-lime text-bg-primary
-                             shadow-[0_0_20px_rgba(163,255,18,0.2)] hover:shadow-[0_0_40px_rgba(163,255,18,0.35)]
-                             transition-shadow"
+                  onClick={() => handleDeploy(selectedZone!)}
+                  className={`w-full py-3 rounded-xl font-display font-bold text-sm tracking-wide transition-all ${
+                    deployed === selectedZone?.id
+                      ? 'bg-green/20 border border-green/40 text-green'
+                      : 'bg-lime text-bg-primary shadow-[0_0_20px_rgba(163,255,18,0.2)] hover:shadow-[0_0_40px_rgba(163,255,18,0.35)]'
+                  }`}
                 >
-                  ⚡ Deploy Patrol Unit
+                  {deployed === selectedZone?.id ? '✓ Dispatch Sent — Routing to Patrols…' : '⚡ Deploy Patrol Unit'}
                 </motion.button>
               </div>
             </motion.aside>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAppStore, type ModuleId } from '@/stores/appStore'
+import { useDataStore } from '@/stores/dataStore'
 import useLiveFeed from '@/hooks/useLiveFeed'
 
 function useClock() {
@@ -41,6 +42,8 @@ export default function StatusBar() {
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed)
   const feed = useLiveFeed()
   const currentIncident = feed.currentIncident
+  const totalViolations = useDataStore((s) => s.summary.totalViolations)
+  const windowSize = feed.currentEvents.length > 0 ? 25 : 0
 
   const sidebarWidth = sidebarCollapsed ? 64 : 260
 
@@ -96,7 +99,7 @@ export default function StatusBar() {
         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border bg-bg-secondary/50">
           <span className="w-1.5 h-1.5 rounded-full bg-lime/50" />
           <span className="text-[10px] font-mono text-text-muted tracking-wider">
-            Window {feed.currentEvents.length}/25 | 292,649 source records
+            Window {feed.currentEvents.length}/{windowSize} | {totalViolations.toLocaleString('en-IN')} source records
           </span>
         </div>
       </div>
