@@ -8,6 +8,7 @@ import {
 
 import { useDataStore } from '@/stores/dataStore';
 import useLiveFeed from '@/hooks/useLiveFeed';
+import { useLiveInsights } from '@/hooks/useLiveInsights';
 
 // ─────────── Types ───────────
 interface StationEntry {
@@ -305,6 +306,15 @@ const CommandDashboard = () => {
   const monthlyData = useDataStore((s) => s.monthly);
   const dayData = useDataStore((s) => s.days);
   const insightsData = useDataStore((s) => s.insights);
+
+  const {
+    loading: aiLoading,
+    error: aiError,
+    lastUpdated: aiLastUpdated,
+    autoSync: aiAutoSync,
+    setAutoSync: setAiAutoSync,
+    generate: regenerateAi,
+  } = useLiveInsights();
 
   // Filter state
   const [activeClasses, setActiveClasses] = useState<Set<VehicleClassKey>>(new Set(VEHICLE_CLASSES));
@@ -690,13 +700,87 @@ const CommandDashboard = () => {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.4 }}
-          className="lg:col-span-6 glass-panel p-5"
+          className="lg:col-span-6 glass-panel p-5 relative overflow-hidden"
         >
-          <SectionTitle title="AI-Derived Insights" />
-          <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1">
-            {(insightsData as InsightEntry[]).slice(0, 6).map((insight, i) => (
-              <InsightCard key={insight.id} insight={insight} index={i} />
-            ))}
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h3 className="font-display text-sm font-semibold text-platinum tracking-wider uppercase flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-lime animate-pulse-glow" />
+              AI-Derived Insights
+            </h3>
+            <div className="flex items-center gap-3">
+              {aiLastUpdated && (
+                <span className="text-[10px] font-mono text-text-muted">
+                  Refreshed: {aiLastUpdated.toLocaleTimeString()}
+                </span>
+              )}
+              <div className="flex items-center gap-1.5 bg-bg-secondary px-2 py-1 rounded border border-border">
+                <button
+                  type="button"
+                  onClick={() => setAiAutoSync(!aiAutoSync)}
+                  className={`text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded transition-all cursor-pointer ${
+                    aiAutoSync ? 'bg-lime/15 text-lime border border-lime/30' : 'text-text-muted hover:text-text-secondary border border-transparent'
+                  }`}
+                  title="Automatically refresh insights as live traffic incident feed updates"
+                >
+                  Auto-Sync {aiAutoSync ? 'ON' : 'OFF'}
+                </button>
+                <span className="text-text-muted text-xs">|</span>
+                <button
+                  type="button"
+                  onClick={regenerateAi}
+                  disabled={aiLoading}
+                  className="text-[9px] font-mono uppercase tracking-wider text-lime hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                >
+                  {aiLoading ? (
+                    <span className="w-2.5 h-2.5 border border-lime border-t-transparent rounded-full animate-spin shrink-0" />
+                  ) : (
+                    '🔄'
+                  )}
+                  <span>Recalculate</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Error Message */}
+          {aiError && (
+            <div className="mb-4 p-3 bg-red/10 border border-red/20 text-red rounded text-xs flex justify-between items-center">
+              <span>⚠️ Error: {aiError}</span>
+              <button type="button" onClick={regenerateAi} className="underline font-bold font-mono">Retry</button>
+            </div>
+          )}
+
+          {/* Cards List / Loading state */}
+          <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1 relative min-h-[200px]">
+            {aiLoading && insightsData.length === 0 ? (
+              // Full skeleton loader
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="glass-card p-4 border-l-[3px] border-l-lime/30 animate-pulse flex flex-col gap-2">
+                  <div className="flex justify-between items-center">
+                    <div className="w-1/3 h-4 bg-lime/10 rounded" />
+                    <div className="w-10 h-4 bg-lime/10 rounded" />
+                  </div>
+                  <div className="w-full h-3 bg-lime/5 rounded" />
+                  <div className="w-3/4 h-3 bg-lime/5 rounded" />
+                </div>
+              ))
+            ) : (
+              <>
+                {/* Visual loading overlay when background updating */}
+                {aiLoading && (
+                  <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] flex items-center justify-center z-10 rounded">
+                    <div className="glass-card px-4 py-3 flex items-center gap-2 shadow-lg shadow-black/80">
+                      <span className="w-4 h-4 border-2 border-lime border-t-transparent rounded-full animate-spin" />
+                      <span className="font-mono text-xs text-lime uppercase tracking-widest animate-pulse">Analyzing Live Incidents...</span>
+                    </div>
+                  </div>
+                )}
+                {(insightsData as InsightEntry[]).slice(0, 6).map((insight, i) => (
+                  <InsightCard key={insight.id} insight={insight} index={i} />
+                ))}
+              </>
+            )}
           </div>
         </motion.div>
 

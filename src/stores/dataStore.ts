@@ -31,6 +31,7 @@ export interface DataState {
   patrolRoutes: typeof initialPatrolRoutes
   violations: typeof initialViolations
   addIncident: (event: LiveEvent) => void
+  updateInsights: (insights: typeof insightsData) => void
 }
 
 export const useDataStore = create<DataState>((set) => ({
@@ -45,6 +46,8 @@ export const useDataStore = create<DataState>((set) => ({
   zones: JSON.parse(JSON.stringify(initialZones)),
   patrolRoutes: JSON.parse(JSON.stringify(initialPatrolRoutes)),
   violations: JSON.parse(JSON.stringify(initialViolations)),
+
+  updateInsights: (insights) => set({ insights: JSON.parse(JSON.stringify(insights)) }),
 
   addIncident: (event: LiveEvent) => set((state) => {
     // Deep clone to safely mutate
