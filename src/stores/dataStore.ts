@@ -62,8 +62,20 @@ export const useDataStore = create<DataState>((set) => ({
     const patrolRoutes = JSON.parse(JSON.stringify(state.patrolRoutes)) as typeof initialPatrolRoutes
     const violations = JSON.parse(JSON.stringify(state.violations)) as typeof initialViolations
 
-    // 1. Update summary
+    // 1. Calculate dynamic fine amount & high risk status
+    const isHighRisk = !!event.highRisk
+    const violationsList = event.violationType ? event.violationType.split(',').map(v => v.trim()).filter(Boolean) : []
+    const numViolations = Math.max(1, violationsList.length)
+    const baseFine = isHighRisk ? 1500 : 500
+    const extraFine = numViolations > 1 ? (numViolations - 1) * 250 : 0
+    const calculatedFine = baseFine + extraFine
+
+    // 2. Update summary
     summary.totalViolations += 1
+    if (isHighRisk) {
+      summary.highRiskCount += 1
+    }
+    summary.highRiskRate = Number(((summary.highRiskCount / summary.totalViolations) * 100).toFixed(1))
 
     const uiToRawClass: Record<string, string> = {
       'Car': 'CAR',
@@ -74,16 +86,19 @@ export const useDataStore = create<DataState>((set) => ({
     }
     const rawClass = uiToRawClass[event.vehicleClass || ''] || 'CAR'
 
-    // 2. Update stations
+    // 3. Update stations
     const stationIndex = stations.findIndex(s => s.name === event.station)
     if (stationIndex !== -1) {
       stations[stationIndex].totalViolations += 1
       if (rawClass && stations[stationIndex].vehicleClass[rawClass as keyof typeof stations[0]['vehicleClass']] !== undefined) {
         stations[stationIndex].vehicleClass[rawClass as keyof typeof stations[0]['vehicleClass']] += 1
       }
+      if (isHighRisk) {
+        stations[stationIndex].highRisk = (stations[stationIndex].highRisk || 0) + 1
+      }
     }
 
-    // 3. Update vehicles
+    // 4. Update vehicles
     const vClassIndex = vehicles.byClass.findIndex(v => v.vehicleClass === rawClass)
     if (vClassIndex !== -1) {
       vehicles.byClass[vClassIndex].count += 1
@@ -97,12 +112,15 @@ export const useDataStore = create<DataState>((set) => ({
     const now = new Date()
     const currentTimestamp = now.toISOString()
 
-    // 4. Update hourly
+    // 5. Update hourly
     const eventDate = now
     const hour = eventDate.getHours()
     const hourIndex = hourly.hourly.findIndex(h => h.hour === hour)
     if (hourIndex !== -1) {
       hourly.hourly[hourIndex].count += 1
+      if (isHighRisk) {
+        hourly.hourly[hourIndex].highRisk = (hourly.hourly[hourIndex].highRisk || 0) + 1
+      }
     }
     const fullDaysMap = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
     const fullDay = fullDaysMap[eventDate.getDay()] as keyof typeof hourly.heatmap
@@ -110,15 +128,18 @@ export const useDataStore = create<DataState>((set) => ({
       hourly.heatmap[fullDay][hour] += 1
     }
 
-    // 4.5 Update monthly
+    // 6. Update monthly
     const year = eventDate.getFullYear()
     const month = eventDate.getMonth() + 1
     const monthIndex = monthly.findIndex(m => m.year === year && m.month === month)
     if (monthIndex !== -1) {
       monthly[monthIndex].count += 1
+      if (isHighRisk) {
+        monthly[monthIndex].highRisk = (monthly[monthIndex].highRisk || 0) + 1
+      }
     }
     
-    // 5. Update days
+    // 7. Update days
     const day = eventDate.getDay() // 0 is Sunday
     // map to shortDay: 'Sun', 'Mon' etc
     const daysMap = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -128,7 +149,7 @@ export const useDataStore = create<DataState>((set) => ({
       days[dayIndex].count += 1
     }
 
-    // 6. Update violations (add to top)
+    // 8. Update violations (add to top)
     const newViolation: Violation = {
       id: event.id + '-' + Date.now(),
       timestamp: currentTimestamp,
@@ -137,14 +158,14 @@ export const useDataStore = create<DataState>((set) => ({
       vehicleType: event.vehicleClass === '2W' ? 'Scooter' : event.vehicleClass === '3W' ? 'Auto' : event.vehicleClass === 'CAR' ? 'Car' : event.vehicleClass === 'HV' ? 'Truck' : 'Bus',
       violationType: event.violationType || 'Unknown Violation',
       plateNumber: event.plateNumber || 'UNKNOWN',
-      fineAmount: 500, // mock fine
-      status: 'Pending',
-      officerId: 'SYS-AUTO'
+      fineAmount: calculatedFine,
+      status: isHighRisk ? 'Escalated' : 'Pending',
+      officerId: event.station || 'SYS-AUTO'
     }
     violations.unshift(newViolation)
     if (violations.length > 500) violations.pop() // keep last 500 to avoid memory leak
 
-    // 7. Update hotspots
+    // 9. Update hotspots
     const hotspotIndex = hotspots.findIndex(h => h.name === event.hotspot || h.id === event.hotspot)
     if (hotspotIndex !== -1) {
       hotspots[hotspotIndex].violationCount += 1
@@ -155,22 +176,23 @@ export const useDataStore = create<DataState>((set) => ({
       hotspots[hotspotIndex].severity = Math.min(100, hotspots[hotspotIndex].severity + 0.1)
     }
 
-    // 8. Update zones
+    // 10. Update zones
     const zoneIndex = zones.findIndex(z => z.name === event.station || z.stationName === event.station || z.stationName.startsWith(event.station || ''))
     if (zoneIndex !== -1) {
       zones[zoneIndex].stats.totalViolations += 1
+      zones[zoneIndex].stats.revenue += calculatedFine
       const vTypeLower = newViolation.vehicleType.toLowerCase() + 's'
       if (zones[zoneIndex].vehicleComposition[vTypeLower as keyof typeof zones[0]['vehicleComposition']] !== undefined) {
         zones[zoneIndex].vehicleComposition[vTypeLower as keyof typeof zones[0]['vehicleComposition']] += 1
       }
     }
 
-    // 9. Update patrol routes
+    // 11. Update patrol routes
     if (hotspotIndex !== -1) {
       const hName = hotspots[hotspotIndex].name
       patrolRoutes.forEach(route => {
         if (route.hotspots.includes(hName)) {
-          route.predictedRevenue += 500
+          route.predictedRevenue += calculatedFine
         }
       })
     }
