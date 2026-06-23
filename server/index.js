@@ -287,7 +287,7 @@ async function route(req, res) {
   sendJson(res, 404, { error: 'Route not found.' })
 }
 
-const server = createServer(async (req, res) => {
+export default async function handler(req, res) {
   try {
     await route(req, res)
   } catch (error) {
@@ -297,9 +297,12 @@ const server = createServer(async (req, res) => {
     })
     if (statusCode === 500) console.error(error)
   }
-})
+}
 
-server.listen(port, host, () => {
-  console.log(`GridLock API listening at http://${host}:${port}`)
-  console.log(`Data directory: ${getActiveDataDirectory()}`)
-})
+if (!process.env.VERCEL) {
+  const server = createServer(handler)
+  server.listen(port, host, () => {
+    console.log(`GridLock API listening at http://${host}:${port}`)
+    console.log(`Data directory: ${getActiveDataDirectory()}`)
+  })
+}

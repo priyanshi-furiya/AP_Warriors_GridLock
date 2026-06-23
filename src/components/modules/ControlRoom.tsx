@@ -188,7 +188,7 @@ export default function ControlRoom() {
       </motion.div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-5 flex-1 min-h-0">
-        <div className="flex flex-col gap-5 overflow-y-auto xl:overflow-hidden">
+        <div className="flex flex-col gap-5 overflow-y-auto pr-1 pb-4">
           <motion.section
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -357,7 +357,7 @@ export default function ControlRoom() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="glass-panel p-5 hud-corner flex-1 flex flex-col min-h-0"
+            className="glass-panel p-5 hud-corner flex-1 flex flex-col min-h-[300px]"
           >
             <div className="flex items-center justify-between mb-4 shrink-0">
               <div>
@@ -389,7 +389,7 @@ export default function ControlRoom() {
           </motion.section>
         </div>
 
-        <div className="flex flex-col gap-5 overflow-y-auto xl:overflow-hidden">
+        <div className="flex flex-col gap-5 overflow-y-auto pr-1 pb-4">
           <motion.section
             initial={{ opacity: 0, x: 16 }}
             animate={{ opacity: 1, x: 0 }}
