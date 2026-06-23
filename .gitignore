@@ -33,5 +33,5 @@ dist-ssr
 *.sw?
 
 # Processed Data
-data/processed/
-src/data/real/*.json
+# data/processed/
+# src/data/real/*.json
